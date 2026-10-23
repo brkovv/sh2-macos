@@ -1,0 +1,252 @@
+[
+  {
+    "unit": "recomp_0005.c",
+    "function": "sub_00447830",
+    "sha256": "d21e944018698587392cb39efd4a7386afb54342029ccfc9f1460c2125f8dbda",
+    "replacements": [],
+    "wrap": true,
+    "regenerated_manual_sha256": "0adb3d5bc8d8b477e0f09920f20745d8240fcb83c39a21d60637e0e3bb6dcda9"
+  },
+  {
+    "unit": "recomp_0020.c",
+    "function": "sub_0055BF60",
+    "sha256": "715591e68e62c0fe686c6eae3e36a2fe757bac2e720741d0857d70b5a190fb8d",
+    "replacements": [],
+    "wrap": true
+  },
+  {
+    "unit": "recomp_0021.c",
+    "function": "sub_0055C6A0",
+    "sha256": "c9025ae75c7897803f370908a4119aab47e9f7981387a41160e137d94dc5ed70",
+    "replacements": [],
+    "wrap": true
+  },
+  {
+    "unit": "recomp_0021.c",
+    "function": "sub_0055C720",
+    "sha256": "db5866af13b9c190065bc391eb27d9e43acddcf2b9414a5d51af8f9d6ab53450",
+    "replacements": [],
+    "wrap": true
+  },
+  {
+    "unit": "recomp_0021.c",
+    "function": "sub_0055CC60",
+    "sha256": "b61187b0054b838da8e43e60008924877ad61df8eb9d471346c990880f91b787",
+    "replacements": [],
+    "wrap": true
+  },
+  {
+    "unit": "recomp_0016.c",
+    "function": "sub_0050A1E0",
+    "sha256": "05d73b5c3c96ad2bd260a04cf7572d9c389899bcef3dca87de91918c125c7cbc",
+    "replacements": [
+      [
+        "MEM16(0x89FF8A) = 0x3C;",
+        "MEM16(0x89FF8A) = ee_desktop_fps==60 ? 0x78 : 0x3C;"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0016.c",
+    "function": "sub_0050A550",
+    "sha256": "66e2b311c73427f9dc17a9cbd54f5ce7d14672c34afae92c4fd31e92d7e33a4e",
+    "replacements": [
+      [
+        "MEM16(0x89FF8A) = 0x3C;",
+        "MEM16(0x89FF8A) = ee_desktop_fps==60 ? 0x78 : 0x3C;"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0010.c",
+    "function": "sub_004AE580",
+    "sha256": "173d120e148ba4230058a590fec34c964cb7d12c1915d60478988a5a8d7da05d",
+    "replacements": [
+      [
+        "MEM32(esi + 0xA0) = MEM32(esi + 0xA0) + eax;",
+        "MEM32(esi + 0xA0) = MEM32(esi + 0xA0) + eax;\n    if (ee_desktop_fps==60) MEM32(esi+0xA0)*=2;"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0018.c",
+    "function": "sub_00535480",
+    "sha256": "6868c19596603c1c1c1ce75abd96e738a79cf39c3ece1e91043d0c58ba2075da",
+    "replacements": [
+      [
+        "loc_005359D5: ;\n    fp_push(MEMF(esi + 0x13C)); /* fld float */\n    edx = MEM32(esi + 0x11C);\n    fp_top() = RECOMP_FP_PC(fp_top() - MEMF(esi + 0x11C));",
+        "loc_005359D5: ;\n    fp_push(MEMF(esi + 0x13C)); /* fld float */\n    edx = MEM32(esi + 0x11C);\n    fp_top() = RECOMP_FP_PC(fp_top() - MEMF(esi + 0x11C)*(ee_desktop_fps==60 ? MEMF(0xA33360)*30.0f : 1.0f));"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0020.c",
+    "function": "sub_0054AD50",
+    "sha256": "8b6c9e0d8a84127d390ed35ee884de281d8c33003231ea70af18b64ed1c366b2",
+    "replacements": [
+      [
+        "loc_0054B330: ;",
+        "loc_0054B330: ;\n    if (ee_desktop_fps==60 && !esi && (int8_t)MEM8(esp+0x18)>=0 && (int16_t)ecx>=(int8_t)MEM8(esp+0x18)) {\n        MEM8(0x1FB8070)++;\n        POP32(esp,esi);POP32(esp,ebp);POP32(esp,ebx);esp+=0x1B0;esp+=4;return;\n    }"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0020.c",
+    "function": "sub_0054AFB8",
+    "sha256": "05587cbeea4c101dc345f5952b1553664dc5e3308aa1c28b68ddf8b93aca840f",
+    "replacements": [
+      [
+        "loc_0054B330: ;",
+        "loc_0054B330: ;\n    if (ee_desktop_fps==60 && !esi && (int8_t)MEM8(esp+0x18)>=0 && (int16_t)ecx>=(int8_t)MEM8(esp+0x18)) {\n        MEM8(0x1FB8070)++;\n        POP32(esp,esi);POP32(esp,ebp);POP32(esp,ebx);esp+=0x1B0;esp+=4;return;\n    }"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0020.c",
+    "function": "sub_00549500",
+    "sha256": "0423e04fa7b6df3ef6a1e55f126dadf86fb8a43bb966dbe9d05f3ea8b964c4aa",
+    "replacements": [
+      [
+        "loc_00549715: ;",
+        "loc_00549715: ;\n    if (ee_desktop_fps==60 && !esi && (int8_t)MEM8(esp+0x10)>=0 && (int16_t)ecx>=(int8_t)MEM8(esp+0x10)) {\n        MEM8(0x1FB8070)++;\n        POP32(esp,esi);esp+=0x12C;esp+=4;return;\n    }"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0009.c",
+    "function": "sub_0049C610",
+    "sha256": "fb50398efee4f86e7fb2651634e51b5b9e42060b6323c544e1685c341fc5e979",
+    "replacements": [
+      [
+        "loc_0049C634: ;",
+        "loc_0049C634: ;\n    if (ee_desktop_fps==60) {\n        int result=ee60_map_marker();\n        if (result==1) goto loc_0049C814;\n        if (result==2) goto loc_0049C731;\n    }"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0009.c",
+    "function": "sub_0049DC30",
+    "sha256": "6bc7a7d3a3d49c9b0c2009c9b4fb5032980342ece97988448921a8470ee17378",
+    "replacements": [
+      [
+        "MEMF(0x94D930) = (float)fp_top(); /* fst */\n    g_fp_cmp = RECOMP_FCMP(fp_top(), MEMF(0x62EDF4));",
+        "MEMF(0x94D930) = (float)fp_top(); /* fst */\n    g_fp_cmp = RECOMP_FCMP(fp_top(), (ee_desktop_fps==60 ? .99999f : MEMF(0x62EDF4)));"
+      ],
+      [
+        "MEMF(0x94D8EC) = (float)fp_top(); /* fst */\n    g_fp_cmp = RECOMP_FCMP(fp_top(), MEMF(0x62EDF4));",
+        "MEMF(0x94D8EC) = (float)fp_top(); /* fst */\n    g_fp_cmp = RECOMP_FCMP(fp_top(), (ee_desktop_fps==60 ? .99999f : MEMF(0x62EDF4)));"
+      ]
+    ],
+    "regenerated_sha256": [
+      "ad18557aca730961d02c139534b8c1738892fab7994c7c571a4c1e05524c42d1"
+    ]
+  },
+  {
+    "unit": "recomp_0009.c",
+    "function": "sub_004A3EC0",
+    "sha256": "09f2438b43c1973a576bbf827a9b44dd29a07c0ba8bb68ebe1e6ee7692a08077",
+    "replacements": [
+      [
+        "    fp_push(MEMF(esi + 0x48)); /* fld float */\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x63348C)); /* fmul dword ptr [0x63348c] */",
+        "    fp_push(MEMF(esi + 0x48)); /* fld float */\n    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? .1f : MEMF(0x63348C))); /* fmul dword ptr [0x63348c] */"
+      ],
+      [
+        "    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x62BF7C)); /* fmul dword ptr [0x62bf7c] */",
+        "    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? .125f : MEMF(0x62BF7C))); /* fmul dword ptr [0x62bf7c] */"
+      ],
+      [
+        "    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x69F3F0)); /* fmul dword ptr [0x69f3f0] */",
+        "    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? .15f : MEMF(0x69F3F0))); /* fmul dword ptr [0x69f3f0] */"
+      ],
+      [
+        "loc_004A4060: ;\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x6A91EC)); /* fmul dword ptr [0x6a91ec] */",
+        "loc_004A4060: ;\n    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? 50.0f : MEMF(0x6A91EC))); /* fmul dword ptr [0x6a91ec] */"
+      ],
+      [
+        "loc_004A3F5B: ;\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x6A91EC)); /* fmul dword ptr [0x6a91ec] */",
+        "loc_004A3F5B: ;\n    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? 50.0f : MEMF(0x6A91EC))); /* fmul dword ptr [0x6a91ec] */"
+      ]
+    ],
+    "regenerated_sha256": [
+      "3a80070271e30710e6d277d1b40183c0a59266d9600ea80f9e7ba63c04d27e78"
+    ]
+  },
+  {
+    "unit": "recomp_0009.c",
+    "function": "sub_004A43F0",
+    "sha256": "e787ca88e630c0b1bef2cc25f50e3fa5871d246356371ad062e05aff44ff0378",
+    "replacements": [
+      [
+        "    { double _t = fp_top(); fp_top() = fp_st1(); fp_st1() = _t; } /* fxch st(1) */\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(esi + 0x54)); /* fmul dword ptr [esi + 0x54] */\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x69F3F0)); /* fmul dword ptr [0x69f3f0] */",
+        "    { double _t = fp_top(); fp_top() = fp_st1(); fp_st1() = _t; } /* fxch st(1) */\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(esi + 0x54)); /* fmul dword ptr [esi + 0x54] */\n    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? .15f : MEMF(0x69F3F0))); /* fmul dword ptr [0x69f3f0] */"
+      ],
+      [
+        "    MEMF(esp + 0x18) = (float)fp_top(); fp_pop(); /* fstp */\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(esi + 0x54)); /* fmul dword ptr [esi + 0x54] */\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x69F3F0)); /* fmul dword ptr [0x69f3f0] */",
+        "    MEMF(esp + 0x18) = (float)fp_top(); fp_pop(); /* fstp */\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(esi + 0x54)); /* fmul dword ptr [esi + 0x54] */\n    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? .15f : MEMF(0x69F3F0))); /* fmul dword ptr [0x69f3f0] */"
+      ],
+      [
+        "    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x62FE1C)); /* fmul dword ptr [0x62fe1c] */",
+        "    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? .25f : MEMF(0x62FE1C))); /* fmul dword ptr [0x62fe1c] */"
+      ],
+      [
+        "loc_004A4521: ;\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x6A91EC)); /* fmul dword ptr [0x6a91ec] */",
+        "loc_004A4521: ;\n    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? 50.0f : MEMF(0x6A91EC))); /* fmul dword ptr [0x6a91ec] */"
+      ],
+      [
+        "loc_004A445D: ;\n    fp_top() = RECOMP_FP_PC(fp_top() * MEMF(0x6A91EC)); /* fmul dword ptr [0x6a91ec] */",
+        "loc_004A445D: ;\n    fp_top() = RECOMP_FP_PC(fp_top() * (ee_desktop_fps==60 ? 50.0f : MEMF(0x6A91EC))); /* fmul dword ptr [0x6a91ec] */"
+      ]
+    ],
+    "regenerated_sha256": [
+      "810e5e29cf42406c15cee1ea26f2011bfd3aba9a1418f246f0f62a6e33d628d7"
+    ]
+  },
+  {
+    "unit": "recomp_0009.c",
+    "function": "sub_004A4A10",
+    "sha256": "34f5e13e54e907cabab73986a30fb6354c590e32373148db629ffecf0bfd0ebd",
+    "replacements": [
+      [
+        "loc_004A4A10: ;",
+        "loc_004A4A10: ;\n    if (ee_desktop_fps==60 && !ee60_spray_active()) {esp+=4;return;}"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0009.c",
+    "function": "sub_004A5090",
+    "sha256": "f8d8ee4290bf6f5ae889f8aede8af6467409c795cb47b9728694915546fb3abb",
+    "replacements": [
+      [
+        "loc_004A5090: ;",
+        "loc_004A5090: ;\n    if (ee_desktop_fps==60 && !ee60_spray_active()) {esp+=4;return;}"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0007.c",
+    "function": "sub_00478290",
+    "sha256": "a266b760f3fb09a6e99c7fa62bf83769bcc6f500fd7cb6bb0d63c735f458a20a",
+    "replacements": [
+      [
+        "SET_LO8(eax, MEM8(esp + 4));\n    MEM32(0x942630) = 0;",
+        "SET_LO8(eax, ee_desktop_fps==60 ? (uint8_t)recomp_fist((double)(int32_t)MEM32(esp+4)*.125,g_fp_control_word,32) : MEM8(esp+4));\n    MEM32(0x942630) = 0;"
+      ]
+    ]
+  },
+  {
+    "unit": "recomp_0010.c",
+    "function": "sub_004B0A20",
+    "sha256": "8ba8c767df03b19800359fdf84338cf7186da0548c0d02ed65a39c0db8a2b4d7",
+    "replacements": [
+      [
+        "if (CMP_NE(_fa, _fb)) goto loc_004B0A53; /* jne: not equal / not zero */",
+        "if (ee_desktop_fps==60) {\n        if ((int8_t)LO8(eax)>80) {PUSH32(esp,0x004B0A53u);sub_004A8210();goto loc_004B0A53;}\n    } else if (CMP_NE(_fa,_fb)) goto loc_004B0A53;"
+      ],
+      [
+        "PUSH32(esp, 0x5A);",
+        "PUSH32(esp, ee_desktop_fps==60 ? 5 : 0x5A);"
+      ]
+    ]
+  }
+]

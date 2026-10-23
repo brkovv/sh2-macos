@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0-alpha.3",
+  "distribution": "public-source-prerelease",
+  "target_repository": "brkovv/sh2-macos",
+  "upstream_redistribution_permission": true,
+  "actual_mac_clean_install_test": false,
+  "full_game_regression_test": false,
+  "signing_and_notarization": false,
+  "published": false,
+  "reference_layout": "goliathret/EdgeOfTimeRecomp",
+  "app_bundle_layout_verified": true,
+  "dmg_creation_verified": false,
+  "license": "MIT",
+  "third_party_notices_reviewed": true,
+  "prerelease": true
+}

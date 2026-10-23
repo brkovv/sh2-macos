@@ -1,0 +1,12 @@
+__pycache__/
+.DS_Store
+game/
+private/
+logs/
+dist/
+source/game
+source/build/
+source/src/recomp/gen/
+*.dmg
+*.app/
+*.f32

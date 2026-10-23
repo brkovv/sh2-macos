@@ -1,0 +1,11 @@
+{
+  "platform": "Linux x86-64/WSL, not macOS",
+  "source_only_generation_and_build_passed": true,
+  "source_commit": "95ae2f16efc09c82f405f04383a27d98c2fa804a",
+  "game_exe_sha256": "f31a221779fadca4dae8fe758546ecde8b88a88fa6e80fad7dee115d2ef620e8",
+  "translated_functions": 7153,
+  "game_binary_sha256": "07d3f95a6a1c3d6c630ace26aea02a4ec4efc4c8d67bdbff32456d7cddea8b9e",
+  "runtime_seconds": 95.07,
+  "intro_settings_credits_game_passed": true,
+  "actual_mac_execution": false
+}

@@ -1,0 +1,321 @@
+{
+  "repository": "https://github.com/ilyuXer/Silent-Hill-2-Enchanced-Edition-Rus",
+  "commit": "0948fe2b637d009711834a1096e5f1154badc422",
+  "url": "https://codeload.github.com/ilyuXer/Silent-Hill-2-Enchanced-Edition-Rus/zip/0948fe2b637d009711834a1096e5f1154badc422",
+  "sha256": "8fd004d3fbf09cb9c2a06d8dbcfb75d345caec6d5fb33c7c3a334d4b921b2015",
+  "prefix": "Silent-Hill-2-Enchanced-Edition-Rus-0948fe2b637d009711834a1096e5f1154badc422/Silent Hill 2 by Metallist Fixed/RussianLangPack/lang/",
+  "files": {
+    "etc/message/common_msg_g.mes": {
+      "bytes": 1194,
+      "sha256": "dd66bb22df966f88a0fc5ca61e8668ed7a220f2d8535a6f470f0dfd0e94ee22b"
+    },
+    "etc/message/config_pc_msg_g.mes": {
+      "bytes": 824,
+      "sha256": "9b13deae66402984ed1d6d01dd2b76634bcbee193881da7b534d99d4a4696acc"
+    },
+    "etc/message/item_msg_g.mes": {
+      "bytes": 13438,
+      "sha256": "3df58a48c202d3e61f86055b43b685d76c089e09f837ec184aa92822f7dd0d6c"
+    },
+    "etc/message/item_x_msg_g.mes": {
+      "bytes": 15208,
+      "sha256": "03b4c53321b34be2c6792c618991ffe9b2e2a062db47bd9e6ab3aba9909b7d80"
+    },
+    "etc/message/letter_msg_g.mes": {
+      "bytes": 2472,
+      "sha256": "f404ba8eb5b59984958c9e249f0e587e029d9e4ff75a38400d6937450bcb9f00"
+    },
+    "etc/message/letter_w0_msg_g.mes": {
+      "bytes": 2470,
+      "sha256": "aa5dfb7b74a8d3bc6d000867e9c99cf8bbe3e19daefa05e01a9346d3633e873c"
+    },
+    "etc/message/letter_w1_msg_g.mes": {
+      "bytes": 2416,
+      "sha256": "b1abc27fca4e9f4f178c60dad159bd7005410f0eb25f3edfd18efdd190e004f9"
+    },
+    "etc/message/letter_w2_msg_g.mes": {
+      "bytes": 56,
+      "sha256": "a4ce1f9958c15f8e955becb59e6f7d43622d205d686cf6031375084252919100"
+    },
+    "etc/message/m_card_msg_g.mes": {
+      "bytes": 2978,
+      "sha256": "990ab306010cae6ce841205307020ad2aac94907c6ed8c61bd1c6291c72ee347"
+    },
+    "etc/message/m_card_x_msg_g.mes": {
+      "bytes": 7952,
+      "sha256": "27213e5d0ce5929d35365d19da220928cf8c0b45c2bfe207e3a68665bf018ee1"
+    },
+    "etc/message/memo_msg_g.mes": {
+      "bytes": 21902,
+      "sha256": "4f10ce0df01efe7645189b22ce3cc29730255fbf9744295554037c25b7ba4b77"
+    },
+    "etc/message/memo_x_msg_g.mes": {
+      "bytes": 23834,
+      "sha256": "844397d8e4e79857071aa1c4c3ee31d44399b99c5efe768b6f8cff89a5f8e32f"
+    },
+    "etc/message/option_msg_g.mes": {
+      "bytes": 5992,
+      "sha256": "6d59195e5cc5aaca6a7e5b648cbc414783f54282a1804143c6735a180cabf851"
+    },
+    "etc/message/result_msg_g.mes": {
+      "bytes": 628,
+      "sha256": "08bb1b548a4eb2bf106ebf44e2e1bdf3f29979a18730ab9b366e08ea8744b7aa"
+    },
+    "etc/message/stage_apart_boss_msg_g.mes": {
+      "bytes": 2,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    "etc/message/stage_apart_e1f_msg_g.mes": {
+      "bytes": 2332,
+      "sha256": "496ebaa95d3c607bd8c2ead62aefc2b59429d2877e4ee9b935db5ea0c0eaf8e7"
+    },
+    "etc/message/stage_apart_e2f_msg_g.mes": {
+      "bytes": 4372,
+      "sha256": "d94b08b395790cd26e7255552b3e81677456b5e189cc0323ebbfa964a345cda8"
+    },
+    "etc/message/stage_apart_e3fe_msg_g.mes": {
+      "bytes": 406,
+      "sha256": "ccf85be3561dc6f19483a7f5e4e27cac07dca30a7f93bb65f3303f6177b7104e"
+    },
+    "etc/message/stage_apart_e3fw_msg_g.mes": {
+      "bytes": 450,
+      "sha256": "401e5037978330088de291d7177c591a3496e0efb2638edc69b5600e082f5d44"
+    },
+    "etc/message/stage_apart_out_msg_g.mes": {
+      "bytes": 2456,
+      "sha256": "bf4c7b8307a4dfc6fa7086bcebca4cac62e31f7b6709f787e08af12918c94313"
+    },
+    "etc/message/stage_apart_stair_msg_g.mes": {
+      "bytes": 236,
+      "sha256": "42767482e928bd9d26faa5eeba151911a910882901e2c4d0656f09a5e8d86185"
+    },
+    "etc/message/stage_apart_w1f_msg_g.mes": {
+      "bytes": 4502,
+      "sha256": "a1cb05d62bcb1cf78625cfb351f615676fdb70355becf0512ba4f7adaa2b8023"
+    },
+    "etc/message/stage_apart_w2f_msg_g.mes": {
+      "bytes": 1104,
+      "sha256": "5b27c3f6a039ab31e38391cdf6d67100b72b935b8ee5c9a673be9d986686d63f"
+    },
+    "etc/message/stage_bowling_msg_g.mes": {
+      "bytes": 1306,
+      "sha256": "622f476076f9374b3ac888396481828c81b73c3e79c4e5930e8d5210f83e88fd"
+    },
+    "etc/message/stage_delusion_2_msg_g.mes": {
+      "bytes": 660,
+      "sha256": "25cd28f66fe0660770e5b2ca7663607990d6405d924d33b667bf370096abcd29"
+    },
+    "etc/message/stage_delusion_3_msg_g.mes": {
+      "bytes": 576,
+      "sha256": "040d6b5e035ef905336b22808f753f765cd9a2923f63404e4c34f9bbbd9363ea"
+    },
+    "etc/message/stage_eddie_boss_msg_g.mes": {
+      "bytes": 1962,
+      "sha256": "892f5bdaa89a4602c314f8e218149f5e3ac57ee2ceef0cc47f2b2e37ae89313b"
+    },
+    "etc/message/stage_end_dog_msg_g.mes": {
+      "bytes": 34,
+      "sha256": "f4c44cd9bf1ea4368bedbdc2f7fe174901ef5d9265c5e0327899bc291fe1840b"
+    },
+    "etc/message/stage_end_maria_msg_g.mes": {
+      "bytes": 778,
+      "sha256": "1501165a8e6c1cd7a718bfbcc47f7af5d341d048a70df9f08bb7a86dc1695ab1"
+    },
+    "etc/message/stage_end_rebirth_msg_g.mes": {
+      "bytes": 532,
+      "sha256": "44e23be2f733ab59e0bd7da2fe236d78067c797ebc3352e08939714834cf2275"
+    },
+    "etc/message/stage_end_recovery_msg_g.mes": {
+      "bytes": 1224,
+      "sha256": "85f3944d5eab6f31f4c7e65c46c22903d982256eb9ac182fc8afc9ae8a226ff4"
+    },
+    "etc/message/stage_end_suicide_msg_g.mes": {
+      "bytes": 1222,
+      "sha256": "3df08c78721e01a16bff8ca57ecaec47c5f02f8bc4fc579adf9fdba4d0333898"
+    },
+    "etc/message/stage_forest_msg_g.mes": {
+      "bytes": 1786,
+      "sha256": "041e89338a2f6b7e0c766b4fc8258db3c940cb156645d866bc38c528c0a59244"
+    },
+    "etc/message/stage_heaven_night_msg_g.mes": {
+      "bytes": 676,
+      "sha256": "136e39bfa9daeb5df0067ffdd65bf763055b82399b9fe02844f262f777af25fb"
+    },
+    "etc/message/stage_hospital_1f_f_msg_g.mes": {
+      "bytes": 4150,
+      "sha256": "f37976c236e0f60afe1c8d358336c05157c518217fcadcb505824b14c32af77a"
+    },
+    "etc/message/stage_hospital_1fe_b_msg_g.mes": {
+      "bytes": 612,
+      "sha256": "8e671a86ff58c53575cc0335e2bc770a695ae45b20e0abb2546c821e602471b8"
+    },
+    "etc/message/stage_hospital_1fw_b_msg_g.mes": {
+      "bytes": 728,
+      "sha256": "136f59a60e0f6735c40e434e4c32aaa230e49cd1562b0b86365b435c45bf01d0"
+    },
+    "etc/message/stage_hospital_2f_b_msg_g.mes": {
+      "bytes": 1256,
+      "sha256": "67a6cbe7106509eeca8669eabfa993314f37686391b7dcd109c2dba2c9b6c9e0"
+    },
+    "etc/message/stage_hospital_2f_f_msg_g.mes": {
+      "bytes": 2108,
+      "sha256": "dc875436b0a1229b1b114493db61b2069812e8b659c0407977040ca360cd4304"
+    },
+    "etc/message/stage_hospital_3f_b_msg_g.mes": {
+      "bytes": 1360,
+      "sha256": "361fb7d7ab5cce1b58e01d38be431e151397fee1feb9afa33939c875cd48fc93"
+    },
+    "etc/message/stage_hospital_3f_f_msg_g.mes": {
+      "bytes": 1732,
+      "sha256": "d1598d4c3c5c9f77f2b0010072b687ff5724f4d88d98897b3b186a799560a4dd"
+    },
+    "etc/message/stage_hospital_bf_b_msg_g.mes": {
+      "bytes": 3898,
+      "sha256": "ece5c561dcfbaae961a9e4a53137ad1e289cb2163e5c8f450bb3e0d68ce12044"
+    },
+    "etc/message/stage_hospital_pass_msg_g.mes": {
+      "bytes": 66,
+      "sha256": "27e6e5b80692f88955a6593ad374952af9e552c82b6968f28a126ae6a60e35ac"
+    },
+    "etc/message/stage_hospital_rf_f_msg_g.mes": {
+      "bytes": 1424,
+      "sha256": "fbb76ddef05e0fe7041cbf2c574ad6679ab788cc928d1f381c0f23d8a7e25269"
+    },
+    "etc/message/stage_hotel_1f_b_msg_g.mes": {
+      "bytes": 1802,
+      "sha256": "be258f2171cf6efe9398e495076062a9b9b0b62dc9424ab9b34ef655ab216b01"
+    },
+    "etc/message/stage_hotel_1f_f_msg_g.mes": {
+      "bytes": 6256,
+      "sha256": "a0f5762458ddc5c09dcc87f9178ecb47fa0c74c6c2d996b38cb93db880dfe0f4"
+    },
+    "etc/message/stage_hotel_2f_b_msg_g.mes": {
+      "bytes": 1528,
+      "sha256": "e23f0c87d27b2a653520b5eb2fce5d91fa5d4880e7ef5766af21cdd448a68586"
+    },
+    "etc/message/stage_hotel_2f_f_msg_g.mes": {
+      "bytes": 1758,
+      "sha256": "aea8d6ea1e2c06b89e892401e51e472bfd149470d9d78be237b9b6f60b79b638"
+    },
+    "etc/message/stage_hotel_3f_b_msg_g.mes": {
+      "bytes": 280,
+      "sha256": "4a0094812f9c7e2547be219d1a7018b89704ca2e500b4ac1d9ca1888f6a84ff3"
+    },
+    "etc/message/stage_hotel_3f_f_msg_g.mes": {
+      "bytes": 2250,
+      "sha256": "ff3e62d7141430ff1af95c43ce33e13594703048c3ddc94e4994adac86daa744"
+    },
+    "etc/message/stage_hotel_bf_b_msg_g.mes": {
+      "bytes": 200,
+      "sha256": "fb8556ba0c99ca5c40d5b2337abe67b8bc5abf0342db9cb289e0b6a1fe39ae51"
+    },
+    "etc/message/stage_hotel_bf_f_msg_g.mes": {
+      "bytes": 1360,
+      "sha256": "471c29f63093db83d9234bff060bb7fa21ed15b88dbb28bd081042a04750ca87"
+    },
+    "etc/message/stage_hotel_fire_msg_g.mes": {
+      "bytes": 872,
+      "sha256": "6e8891babc73e72349cd684f6b0716253e5d2f36cf2a534f693e6257d3d409ad"
+    },
+    "etc/message/stage_labyrinth_e_msg_g.mes": {
+      "bytes": 2124,
+      "sha256": "1ce0d0153c9462abd93b22f50f11471705daff67e05bf5dd0f4dd97baad03b5a"
+    },
+    "etc/message/stage_labyrinth_n_msg_g.mes": {
+      "bytes": 6128,
+      "sha256": "e2570f63f89313cb56cc0d0f234173e6e83c9227fe2f5cd811712923b440f11f"
+    },
+    "etc/message/stage_labyrinth_w_msg_g.mes": {
+      "bytes": 1458,
+      "sha256": "8b11fc0d5da960640b49278cbfca3a0d2ace889e780e0b8b58efc0763672f604"
+    },
+    "etc/message/stage_lake_msg_g.mes": {
+      "bytes": 578,
+      "sha256": "2c36573f8434241542f6226d1f25dc2c1751818d4c99a22e55b00a8c919042b0"
+    },
+    "etc/message/stage_observation_msg_g.mes": {
+      "bytes": 1456,
+      "sha256": "c26a654d4123da9948de886ec992669a08954d3733d6e6fda7324625193067c4"
+    },
+    "etc/message/stage_prison_bf_msg_g.mes": {
+      "bytes": 770,
+      "sha256": "9d0282988bcdb3f0fa5620f2f2d27bcc7689b031d9b1aaa999454a83969387db"
+    },
+    "etc/message/stage_prison_n_msg_g.mes": {
+      "bytes": 3270,
+      "sha256": "306c6e129cd0d16bf52daea8efc82f109536e719aa7a0d18305cb262647a0f4f"
+    },
+    "etc/message/stage_prison_s_msg_g.mes": {
+      "bytes": 1222,
+      "sha256": "ad47b869211cb16f9607575a65fcede00937e316b9a15ce243ad5b9bace36369"
+    },
+    "etc/message/stage_sample_msg_g.mes": {
+      "bytes": 1354,
+      "sha256": "84efafa5d854e23eaa9f358870f2bfb699970ec67ad3b471d687060dc08f64ca"
+    },
+    "etc/message/stage_society_msg_g.mes": {
+      "bytes": 1498,
+      "sha256": "127f35fc5c27e2c127650febd33054a8949b824e14ff03166cb55ad2f9261b32"
+    },
+    "etc/message/stage_tgs_trial_msg_g.mes": {
+      "bytes": 1570,
+      "sha256": "64c2409b32cb951873ede062d1e13a82b4238399db01f1988ba92f34f65de253"
+    },
+    "etc/message/stage_to_heaven_msg_g.mes": {
+      "bytes": 188,
+      "sha256": "34aa1514cffcee52921e8e105c5520665d9586ed95798ed692e9f11438c387c5"
+    },
+    "etc/message/stage_toilet_msg_g.mes": {
+      "bytes": 530,
+      "sha256": "c199f6957bd93155b632638143409a39e376cf865951702e73cb2d6df421cd3b"
+    },
+    "etc/message/stage_town_east_msg_g.mes": {
+      "bytes": 4060,
+      "sha256": "80e6dc73c3fd21a073bbe8c53c7d01e0430b2109d35ff780b10829ff090f3866"
+    },
+    "etc/message/stage_town_west_msg_g.mes": {
+      "bytes": 5732,
+      "sha256": "97b195311bd446e5a0ca025ec8daa26026cee1b068fc857d1f2996b3eaa69b63"
+    },
+    "etc/message/stage_x_apart_msg_g.mes": {
+      "bytes": 736,
+      "sha256": "427d89ee3da9169d08b0ef8329ee736b98175c793e58be0c1efaf061425eba36"
+    },
+    "etc/message/stage_x_heaven_msg_g.mes": {
+      "bytes": 942,
+      "sha256": "464d947cdb9f507f93dbe532fe1e0152ca975a1925df7b2bba3f8e0c9a2a242b"
+    },
+    "etc/message/stage_x_mansion_1f_msg_g.mes": {
+      "bytes": 6380,
+      "sha256": "46147234fae290c0c6a252029312c1ebe9acc8773bd4848c3dced380afba6a1a"
+    },
+    "etc/message/stage_x_mansion_2f_msg_g.mes": {
+      "bytes": 3788,
+      "sha256": "4cc7ca457ead48c57afc6054df04d4c72cbcaaa177ab58c5f4dd9527a414f138"
+    },
+    "etc/message/stage_x_mansion_bf_msg_g.mes": {
+      "bytes": 190,
+      "sha256": "46fa85be959b0368b3aa718c9cb1d633070b7b86b7cce9d30e8cba8e324eb984"
+    },
+    "etc/message/stage_x_town_msg_g.mes": {
+      "bytes": 154,
+      "sha256": "f0b5f53799bf36a0af92080ef080872dff5f13c848325fa9400d95bcf43deafb"
+    },
+    "etc/resource/r_menu_g.res": {
+      "bytes": 1016,
+      "sha256": "dfa1406dc9782926cc98bbf50fdc5b4547a67064b622fa6504f2086bd1d4c792"
+    },
+    "font/font000.png": {
+      "bytes": 340118,
+      "sha256": "e9e2776343009c2674bd806606890be0db480c99189347ca6f2cb1cd655ed63b"
+    },
+    "font/fontwdata.bin": {
+      "bytes": 448,
+      "sha256": "c4c7d238df766bd5b67526b4992901b9bf2409063c26a7c975b67b130daaed0a"
+    },
+    "pic/etc/start01g.tex": {
+      "bytes": 16777296,
+      "sha256": "e1d325aac11ead737662d8088cba4f39f25b334e09ae395ea6c74cd8c7679420"
+    }
+  }
+}

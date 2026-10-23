@@ -1,0 +1,1016 @@
+/* Silent Hill 2 Enhancements (github.com/elishacloud/Silent-Hill-2-Enhancements, zlib license) ported
+ * to the recompiled v1.0 executable. EE patches the game at run time from a d3d8.dll; here the code
+ * patches are applied to the exe before recompilation (tools/patch_exe.py) and EE's hooks become the
+ * functions below. A `sub_X` defined here replaces the generated one; `sub_X_gen` is the original,
+ * which the recompiler emits under that name (regen.sh passes --exclude-manual for this file).
+ *
+ * Addresses are v1.0's, resolved from EE's search patterns by tools/eeaddr.py and tools/eepattern.py. */
+#include "../runtime/rt.h"
+#include <math.h>
+#include <stdbool.h>
+#include <SDL2/SDL.h>
+#include <sys/stat.h>
+#include <ctype.h>
+#include "../runtime/host.h"
+#include "ee_sfx.h"
+#include "desktop.h"
+#include <libavcodec/avcodec.h>
+#ifndef __SWITCH__
+#include <pthread.h>
+#endif
+
+/* ---- game state (EE Patches/Common.cpp, Patches.h) ---- */
+#define EE_ROOM_ID            0x01FB7DACu
+#define EE_EVENT_INDEX        0x00932178u
+#define EE_MENU_EVENT         0x00932174u
+#define EE_TRANSITION_STATE   0x01F7D490u
+#define EE_VIBRATION_LEVEL    0x01DBBFF9u  /* 0 off, 1 soft, 2 normal, 3 hard */
+#define EE_RUMBLE_FLAG        0x00940EB6u
+#define EE_GAMEPAD_TYPE       0x00941148u
+enum { EVENT_IN_GAME = 4, R_NONE = 0, FADE_NONE = 0 };
+
+#ifndef __SWITCH__
+/* v10-ee ADXM_SetupThrd registers 0x55F990/0x55F9E0 as CRI's lock/unlock
+ * callbacks (0x55FE38/0x55FE43). The originals raise the caller's priority and
+ * resume a busy guard thread: that excludes workers only on a single CPU.
+ * SetThreadPriority is a stub here, and Apple offers no strict CPU pinning.
+ * Use actual recursive exclusion for these callbacks, as EE's ADX_lock does.
+ * ADX decoding, stream state and callbacks otherwise remain the guest's. */
+static pthread_once_t cri_once = PTHREAD_ONCE_INIT;
+static pthread_mutex_t cri_mutex;
+static __thread uint32_t cri_depth;
+static void cri_mutex_init(void) {
+    pthread_mutexattr_t attributes;
+    int rc = pthread_mutexattr_init(&attributes);
+    if (rc) rt_fatal("CRI mutex attributes: %d", rc);
+    rc = pthread_mutexattr_settype(&attributes, PTHREAD_MUTEX_RECURSIVE);
+    if (!rc) rc = pthread_mutex_init(&cri_mutex, &attributes);
+    pthread_mutexattr_destroy(&attributes);
+    if (rc) rt_fatal("CRI mutex initialization: %d", rc);
+    rt_log("audio: CRI lock callbacks use a native recursive mutex");
+}
+static void cri_enter(void) {
+    pthread_once(&cri_once, cri_mutex_init);
+    int rc = pthread_mutex_lock(&cri_mutex);
+    if (rc) rt_fatal("CRI mutex lock: %d", rc);
+    MEM32(0x01D81CE0u) = ++cri_depth;
+    g_eax = cri_depth - 1;
+    g_esp += 4;
+}
+static void cri_leave(void) {
+    if (!cri_depth) rt_fatal("unbalanced CRI unlock");
+    g_eax = --cri_depth;
+    MEM32(0x01D81CE0u) = cri_depth;
+    int rc = pthread_mutex_unlock(&cri_mutex);
+    if (rc) rt_fatal("CRI mutex unlock: %d", rc);
+    g_esp += 4;
+}
+#endif
+
+/* ---- input (EE Patches/ControllerTweaks.cpp) ---- */
+#define JOY_STATE        0x00940F20u  /* the game's DIJOYSTATE2 */
+#define USING_GAMEPAD    0x01FB806Au
+#define MOVE_DIRECTION   0x01FB7CE8u
+#define STRAFING_LEFT    0x01FB7F26u
+#define STRAFING_RIGHT   0x01FB7F27u
+
+/* EE settings, as the Enhanced Edition ships them (d3d8.ini). */
+static const int DPadMovementFix = 1;           /* DPAD_MOVEMENT_MODE: the d-pad moves like the stick */
+static const int RestoreSearchCamMovement = 2;  /* right stick (Z / Rz) drives the search camera */
+static int mouse_turn_x, mouse_look_y;
+static uint32_t mouse_held;
+unsigned ee_desktop_fps = 30;
+#define desktop_fps ee_desktop_fps
+
+#ifndef __SWITCH__
+/* Pinned EE SixtyFPSPatch: per-call-site corrections to the shared rate
+ * accessor. Every other caller retains the original value. */
+void sub_00447830(void) {
+    double scale = 1.0;
+    if (desktop_fps == 60) {
+        switch (MEM32(g_esp)) {
+        case 0x00489125u: case 0x00489EA1u: case 0x004B242Bu: scale=.5; break;
+        case 0x00489E90u: case 0x004B2499u: case 0x004F0EFAu:
+        case 0x004F0EB1u: case 0x004F0F17u: case 0x004F0F28u: scale=2.0; break;
+        }
+    }
+    rt_fpush(MEMF(0x00932D48u)*scale);
+    g_esp+=4;
+}
+#endif
+
+static void mouse_key(uint32_t output, uint32_t size, int index) {
+    unsigned key = MEM32(0x01DB8408u + 8 * index);
+    if (key && key < size) MEM8(output + key) = 128;
+}
+void ee_mouse_keyboard(uint32_t output, uint32_t size) {
+    int x, y, wheel;
+    mouse_held = rt_mouse_motion(&x, &y, &wheel);
+    int game = MEM32(EE_EVENT_INDEX) == EVENT_IN_GAME && MEM32(EE_MENU_EVENT) == 13 && MEM8(0x01F7AE80u) != 2;
+    if (game && rt_mouse_game_enabled()) {
+        if (mouse_held & 1) mouse_key(output, size, 6);   /* Action / attack */
+        if (mouse_held & 2) mouse_key(output, size, 15);  /* Ready weapon */
+        if (mouse_held & 4) mouse_key(output, size, 10);  /* Search camera */
+        if (wheel) mouse_key(output, size, wheel > 0 ? 16 : 17);
+        mouse_turn_x = x;
+        mouse_look_y = y;
+        /* The stock camera has fixed views. Turning follows horizontal mouse motion;
+         * while search is held, the right-stick path controls looking instead. */
+        unsigned search = MEM32(0x01DB8408u + 8 * 10);
+        if (search >= size || !MEM8(output + search)) {
+            if (x) mouse_key(output, size, x < 0 ? 0 : 1);
+        }
+    } else {
+        mouse_turn_x = mouse_look_y = 0;
+        /* Stock menus/puzzles consume buffered DirectInput mouse events themselves. */
+        if (mouse_held & 2 && size > 1) MEM8(output + 1) = 128;
+        if ((MEM32(EE_EVENT_INDEX) == 16 || MEM32(EE_EVENT_INDEX) == 8) && mouse_held & 1)
+            mouse_key(output, size, 6);
+        if (wheel && size > 0xD0) MEM8(output + (wheel > 0 ? 0xC8 : 0xD0)) = 128;
+    }
+}
+void ee_mouse_menu(void) {
+    int game = MEM32(EE_EVENT_INDEX) == EVENT_IN_GAME && MEM32(EE_MENU_EVENT) == 13 && MEM8(0x01F7AE80u) != 2;
+    rt_mouse_capture(game && rt_mouse_game_enabled());
+    /* EE InputTweaks pause/quit hitboxes, v10-ee addresses verified against PE.
+     * Only mouse movement changes selection, so keyboard/gamepad still work. */
+    static int last_x = -1, last_y = -1;
+    int x = SMEM32(0x00941358u), y = SMEM32(0x0094135Cu);
+    if ((x != last_x || y != last_y) && MEM32(EE_EVENT_INDEX) == 16) {
+        if (!MEM8(0x00932030u) && x >= 281 && x < 399 && y >= 216 && y < 366)
+            MEM8(0x009326B4u) = (y - 216) / 30;
+        if (MEM8(0x00932030u) && x >= 281 && x < 397 && y >= 245 && y < 275)
+            MEM8(0x009326B0u) = (x - 281) / 58;
+    }
+    last_x = x; last_y = y;
+}
+
+static int is_moving_around(void) {
+    return MEM8(USING_GAMEPAD) || MEM8(STRAFING_LEFT) || MEM8(STRAFING_RIGHT);
+}
+
+/* ProcessDInputData(GamePadState *state): the game turning the polled DIJOYSTATE2 into its pad
+ * state. EE's hook runs first: d-pad movement, then the right stick into state->m_rightStick. */
+extern void sub_00458060_gen(void);
+int dinput_pad_active(void);
+void sub_00458060(void) {
+    uint32_t state = MEM32(g_esp + 4);
+    /* This hook also runs for the keyboard's GamePadState. With no DirectInput pad,
+     * its untouched all-zero DIJOYSTATE2 has POV=0: north, not a centered hat.
+     * Never turn that absent controller into a permanently held forward direction. */
+    if (!dinput_pad_active()) {
+        memset(GPTR(JOY_STATE), 0, 272);
+        for (int i = 0; i < 4; i++) MEM32(JOY_STATE + 32 + 4 * i) = 0xFFFFFFFFu;
+    }
+    uint32_t pov = MEM32(JOY_STATE + 32);
+    if (DPadMovementFix && (pov & 0xFFFF) != 0xFFFF) {
+        double a = (double)pov * M_PI / (180.0 * 100.0);
+        MEM32(JOY_STATE + 0) = (uint32_t)(int32_t)(sin(a) * 32767.0);   /* lX */
+        MEM32(JOY_STATE + 4) = (uint32_t)(int32_t)(cos(a) * -32767.0);  /* lY */
+    }
+    if (RestoreSearchCamMovement == 2) {
+        *(int16_t *)GPTR(state + 0xC) = (int16_t)(int32_t)MEM32(JOY_STATE + 8);   /* lZ */
+        *(int16_t *)GPTR(state + 0xE) = (int16_t)(int32_t)MEM32(JOY_STATE + 20);  /* lRz */
+    }
+    sub_00458060_gen();
+    if (rt_mouse_game_enabled() && ((mouse_held & 4) || MEM8(0x01F811E9u) == 6)) {
+        int x = mouse_turn_x * 1800, y = mouse_look_y * 1800;
+        if (x < -32767) x = -32767; if (x > 32767) x = 32767;
+        if (y < -32767) y = -32767; if (y > 32767) y = 32767;
+        *(int16_t *)GPTR(state + 0xC) = x;
+        *(int16_t *)GPTR(state + 0xE) = y;
+    }
+    if (getenv("SH2_INPUT_STATS")) {
+        static uint32_t previous = 0xFFFFFFFFu;
+        uint32_t buttons = MEM32(state + 0x18);
+        if (buttons != previous) {
+            previous = buttons;
+            rt_log("input: game buttons %08X action=%d raw-space=%u action-key=%u room=%u event=%u pos=%.3f,%.3f,%.3f", buttons,
+                   !!(buttons & 512), MEM8(0x00941040u + 0x39), MEM32(0x01DB8438u), MEM32(EE_ROOM_ID), MEM32(EE_EVENT_INDEX),
+                   MEMF(0x01FB101Cu), MEMF(0x01FB1020u), MEMF(0x01FB1024u));
+        }
+    }
+}
+
+/* UsingSearchCamera, as EE's UsingSearchCamera_SeparateAnalogs at the nine walking call sites EE
+ * patches: walking and looking around at the same time. The two other callers keep the original. */
+extern void sub_00534660_gen(void);
+void sub_00534660(void) {
+    uint32_t ret = MEM32(g_esp);
+    if (ret != 0x0051EC65u && ret != 0x00547FFFu && is_moving_around()) {
+        g_eax = 0;
+        g_esp += 4;
+        return;
+    }
+    sub_00534660_gen();
+}
+
+/* Cave 0x401460, called from 0x535CBD: EE's StartSearchCamera_Hook (TRUE: do not start it). */
+void sub_00401460(void) {
+    uint32_t dir = MEM32(MOVE_DIRECTION);
+    g_eax = is_moving_around() ? 0 : (dir != 0 && dir != 3);
+    g_esp += 4;
+}
+
+/* Cave 0x4015D0, called from 0x4697B5 (`mov eax, 10h` before the event index is stored): EE's
+ * PauseScreenASM, leaving Options from the pause screen straight back to gameplay. */
+void sub_004015D0(void) {
+    guest_call(0x0047EEE0u, 0, NULL, 0);  /* fixes doubled text */
+    guest_call(0x0046AB10u, 0, NULL, 0);  /* the call used when returning to gameplay */
+    guest_call(0x00401032u, 0, NULL, 0);  /* fixes incorrect text */
+    g_eax = 2;
+    g_esp += 4;
+}
+
+/* ---- TexPatch (EE Patches/TexPatch.cpp, EnableTexAddrHack) ----
+ * Texture files are read into load buffers sized for the original game; the EE HD textures are much
+ * larger. tools/patch_exe.py points the game at these guest buffers instead. */
+#define TEX_BUF1 0x04000000u
+#define TEX_BUF2 0x06B00000u
+#define TEX_BUF3 0x09600000u
+#define TITLE_TEXPATH 0x007BA838u
+#define TITLE_PATHS   0x0EC00000u   /* guest strings, committed in ee_init */
+#define TEX_SIZE 44760576u   /* 2 x 22,380,640 bytes, rounded to 4 KB; buffer 3 is twice that */
+
+/* ---- SfxPatch (EE Patches/SfxPatch.cpp, EnableSFXAddrHack) ----
+ * The sound effect bank (data/sound/sddata.bin) is read into a static buffer sized for the 17 MB
+ * original; the audio pack's is 88 MB. tools/patch_exe.py points the game at this guest buffer, and
+ * ee_sfx_init re-indexes the effect table at 0x8A67DC to the RIFF positions of the file in use. */
+#define SFX_BUF 0xD0000000u
+
+static void ee_sfx_init(void) {
+    char host[512];
+    struct stat st;
+    uint32_t size = 0;
+    const char *names[] = {"data/sound/sddata.bin", "data/sound/sddatn.bin"};
+    for (int i = 0; i < 2; i++)
+        if (stat(rt_path(names[i], host, sizeof host), &st) == 0 && (uint32_t)st.st_size > size) size = st.st_size;
+    if (!size) return;
+    host_arena_commit(SFX_BUF, (size + 0x2FFFu) & ~0xFFFu);
+    rt_path(names[0], host, sizeof host);
+    if (strncmp(host, "sh2e/", 5)) return;  /* the original bank: the table already matches */
+    FILE *f = fopen(host, "rb");
+    if (!f) return;
+    enum { BLOCK = 1 << 20 };
+    static uint8_t chunk[BLOCK + 5];
+    uint32_t found[EE_SFX_COUNT], n = 0, x = 0;
+    while (x + 5 < size && n < EE_SFX_COUNT) {
+        size_t want = size - x < BLOCK + 5 ? size - x : BLOCK + 5;
+        fseek(f, x, SEEK_SET);
+        want = fread(chunk, 1, want, f);
+        if (want < 5) break;
+        const uint8_t *p = memmem(chunk, want, "RIFF", 4);
+        if (p) {
+            found[n++] = x + (uint32_t)(p - chunk);
+            x += (uint32_t)(p - chunk) + 5;
+        } else
+            x += BLOCK;
+    }
+    fclose(f);
+    if (n != EE_SFX_COUNT) {
+        rt_log("ee: sfx: found %u of %u RIFF banks in %s, table left alone", n, EE_SFX_COUNT, host);
+        return;
+    }
+    for (int i = 0; i < 700; i++) MEM32(EE_SFX_TABLE + 4 * i) = found[ee_sfx_map[i]];
+    rt_log("ee: sfx table remapped to %s (%u bytes)", host, size);
+}
+
+/* The file read at 0x449FD7 (0x4494A0) gets the load buffer as its second argument; EE reads the same
+ * value from ebp at 0x44A00D, but ebp is a local of the lifted caller, so it is remembered here. */
+static uint32_t tex_load_buffer;
+
+/* FullscreenImages core (EE GetTextureOnLoad / SetImageScaling): when a texture EE lists by its
+ * original size is loaded, the sprite code's scale (patched to read these) becomes new / original
+ * size, so coordinates in original texels still land on the same part of an HD image. */
+#include "ee_textures.h"
+#define EE_TEX_SCALE_X 0x0EC01000u
+#define EE_TEX_SCALE_Y 0x0EC01004u
+#define TEX_NAME_PTR   0x009335ACu   /* char * of the texture being loaded */
+/* Map scaling (EE PatchMapImages / SetMapImageScaling): the HD map pages are 5464x4096 (the square
+ * map between black bands) where the originals are 1024x1024. tools/patch_exe.py points the map's scale constants here and hooks the
+ * caves below; a page's aspect scales the map, its markings and the player icon, and the page is
+ * widened to the screen. An original page gives every value its original. */
+#define MAP_SCALE_X    0x0EC01008u   /* 16 / aspect (was 16.0) */
+#define MAP_MARK_WIDTH 0x0EC0100Cu   /* 0.5 * aspect (was 0.5) */
+#define MAP_ID         0x0094D928u
+extern uint32_t ee_res_w, ee_res_h;  /* d3d8.c */
+static float map_aspect = 1.0f, map_width;
+static int32_t map_res_x, map_res_x43;
+static void ee_map_scaling(uint32_t w, uint32_t h) {
+    float a = (float)h / w, gw = ee_res_w, gh = ee_res_h, s = 16.0f / a, mw = 0.5f * a;
+    map_aspect = a;
+    map_res_x = (uint32_t)(gw * (gh / (gw * (a * 0.75f))));
+    map_res_x43 = (uint32_t)(gw * ((gh / gw) / 0.75f));
+    map_width = (float)(map_res_x43 - map_res_x);
+    memcpy(GPTR(MAP_SCALE_X), &s, 4);
+    memcpy(GPTR(MAP_MARK_WIDTH), &mw, 4);
+    rt_log("ee: map page %ux%u -> aspect %.3f, widened by %.0f", w, h, a, map_width);
+}
+
+/* Called for every file the game opens for reading (EE OnFileLoadTex): a texture EE lists by its
+ * original size sets the scale from the header of the file actually opened (sh2e or data). */
+void ee_file_opened(const char *guest, FILE *f) {
+    char name[256];
+    size_t n = 0;
+    for (; guest[n] && n < sizeof name - 1; n++) name[n] = guest[n] == '\\' ? '/' : (char)tolower((unsigned char)guest[n]);
+    name[n] = 0;
+    const char *d = strstr(name, "data/");  /* drop "./", a drive or the game folder in front */
+    if (!d) return;
+    memmove(name, d, strlen(d) + 1);
+    static int logged;
+    if (strstr(name, "/pic/") && logged++ < 30) rt_log("ee: open %s", name);
+    for (size_t i = 0; i < sizeof ee_texture_list / sizeof *ee_texture_list; i++) {
+        const EeTexSize *t = &ee_texture_list[i];
+        if (!t->ref || strcmp(t->name, name)) continue;
+        uint8_t hdr[128];
+        long at = ftell(f);
+        size_t got = fread(hdr, 1, sizeof hdr, f);
+        fseek(f, at, SEEK_SET);
+        if (got != sizeof hdr || (hdr[0] | hdr[1] << 8 | hdr[2] << 16 | (uint32_t)hdr[3] << 24) != 0x19990901u) return;
+        uint32_t w = 0, h = 0;
+        static const int off[3] = {20, 24, 56};  /* EE GetTextureRes: first non-zero size */
+        for (int k = 0; k < 3 && !(w && h); k++) {
+            w = hdr[off[k]] | hdr[off[k] + 1] << 8;
+            h = hdr[off[k] + 2] | hdr[off[k] + 3] << 8;
+        }
+        if (!w || !h) return;
+        float sx = (float)w / t->x, sy = (float)h / t->y;
+        if (t->map || !strncmp(name, "data/menu/mc/savebg", 19) || !strncmp(name, "data/pic/etc/start00", 20))
+            sx = sy;  /* same scale on both axes for these screens */
+        rt_log("ee: %s %ux%u -> texture scale %.3f %.3f", name, w, h, sx, sy);
+        memcpy(GPTR(EE_TEX_SCALE_X), &sx, 4);
+        memcpy(GPTR(EE_TEX_SCALE_Y), &sy, 4);
+        if (t->map) ee_map_scaling(w, h);
+        return;
+    }
+}
+
+extern void sub_004494A0_gen(void);
+void sub_004494A0(void) {
+    tex_load_buffer = MEM32(g_esp + 8);
+    sub_004494A0_gen();
+}
+
+/* Cave 0x401970, called from 0x44A00D in place of the texture loader 0x448810: EE's TexBufferASM,
+ * which clears the buffer the texture was read into once the loader is done with it. */
+void sub_00401970(void) {
+    rt_resolve(0x00448810u)();  /* same stack and return address: it returns for us */
+    uint32_t at = tex_load_buffer;
+    if (at == TEX_BUF1 || at == TEX_BUF2) memset(GPTR(at), 0, TEX_SIZE);
+    else if (at == TEX_BUF3) memset(GPTR(at), 0, 2 * TEX_SIZE);
+}
+
+
+/* ---- WidescreenFix (tools/ws_patches.py) ----
+ * The game's 2D is laid out in a 4:3 area (the width variable at 0xA33480 holds its width) and these
+ * guest variables, moved into the exe's operands by ws_patches.py, carry the wide screen's offsets.
+ * `resolution=WxH` in sh2e.ini (default 1920x1080; d3d8.c must list it). At 4:3, e.g. 960x720, every
+ * value is the original. */
+#define WS_BASE   0x0EC01100u
+enum { V_W, V_H, V_FW, V_FH, V_HUD, V_W43, V_TEXT, V_F_05, V_F05, V_N640, V_N480, V_BORDER0, V_BORDER1 };
+#define WS_VAR(i) (WS_BASE + 4 * (i))
+#define RES_TABLE 0x0089E884u
+#define WIDTH_VAR 0x00A33480u
+#define ASPECT_VAR 0x01F5EEBCu
+
+static void ws_setf(uint32_t va, float v) { memcpy(GPTR(va), &v, 4); }
+static float ws_getf(uint32_t va) { float v; memcpy(&v, GPTR(va), 4); return v; }
+static float ws_text(void) { return ws_getf(WS_VAR(V_TEXT)); }
+
+static int sfx_flashlight = 1, sfx_save_load = 1;  /* sh2e.ini FlashlightToggleSFX / PreserveSoundsOnLoad */
+static void ee_widescreen_init(void) {
+    uint32_t w = 1920, h = 1080;
+    FILE *f = fopen("sh2e.ini", "r");
+    char line[128];
+    while (f && fgets(line, sizeof line, f)) {
+        unsigned a, b;
+        if (sscanf(line, " resolution = %ux%u", &a, &b) == 2 && a >= 320 && b >= 240 && a <= 1920 && b <= 1440) w = a, h = b;
+        char value[32];
+        if (sscanf(line, " resolution = %31s", value) == 1 && !strcmp(value, "auto")) {
+            rt_window_open();
+            SDL_DisplayMode mode;
+            if (!SDL_GetCurrentDisplayMode(SDL_GetWindowDisplayIndex(rt_window), &mode) && mode.w > 0 && mode.h > 0) {
+                w = 1280; h = (uint32_t)(1280.0 * mode.h / mode.w + 1) & ~1u;
+                if (h < 240) h = 240; if (h > 1440) h = 1440;
+            }
+        }
+    }
+    if (f) fclose(f);
+    ee_res_w = w;
+    ee_res_h = h;
+    desktop_fps = rt_option_int("fps", 30) == 60 ? 60 : 30;
+    rt_log("ee: target %u fps", desktop_fps);
+    rt_input_viewport(w, h);
+    rt_window_open();
+    if (rt_option_int("fullscreen", 0)) SDL_SetWindowFullscreen(rt_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    else SDL_SetWindowSize(rt_window, w > 1280 ? 1280 : w, w > 1280 ? (int)(h * 1280 / w) : h);
+    float fw = w, fh = h, aspect = fw / fh, w43 = (int32_t)(fh * (4.0f / 3.0f));
+    MEM32(WS_VAR(V_W)) = w;
+    MEM32(WS_VAR(V_H)) = h;
+    ws_setf(WS_VAR(V_FW), fw);
+    ws_setf(WS_VAR(V_FH), fh);
+    ws_setf(WS_VAR(V_HUD), 0.5f / ((4.0f / 3.0f) / aspect));
+    MEM32(WS_VAR(V_W43)) = (uint32_t)w43;
+    float toff = (fw - fh * (4.0f / 3.0f)) / 2.0f;
+    ws_setf(WS_VAR(V_TEXT), toff);
+    /* image position: half-width offset of the 4:3 area (WidescreenFix pattern_19/20) */
+    float off = (toff / (2.0f / (aspect / (4.0f / 3.0f)))) / fw;
+    ws_setf(WS_VAR(V_F_05), -0.5f + off);
+    ws_setf(WS_VAR(V_F05), 0.5f + off);
+    /* cutscene letterbox bars: the game's (0.5, 0.5) at 4:3, hidden (0, 1) on a wide screen (EE: DisableCutsceneBorders = Auto) */
+    bool wide = aspect > 1.5f;
+    ws_setf(WS_VAR(V_BORDER0), wide ? 0.0f : 0.5f);
+    ws_setf(WS_VAR(V_BORDER1), wide ? 1.0f : 0.5f);
+    for (int i = 0; i < 22; i++) MEM32(WS_VAR(64 + i)) = w;  /* the 2D width sites (ws_patches.py PIC_INDICES) */
+    for (int i = 0; i < 16; i++) MEM32(WS_VAR(128 + i)) = w;  /* the V_W sites */
+    MEM32(WS_VAR(V_N640)) = 640;
+    MEM32(WS_VAR(V_N480)) = 480;
+    for (int i = 0; i < 6; i++) {  /* every mode is the same screen */
+        MEM32(RES_TABLE + 8 * i) = w;
+        MEM32(RES_TABLE + 8 * i + 4) = h;
+    }
+    MEM32(WIDTH_VAR) = (uint32_t)w43;
+    ws_setf(ASPECT_VAR, aspect);
+    /* cores=1 in sh2e.ini confines the guest threads to one core, the PC's workaround for CRI's looping
+     * music; its cause, lost PulseEvents (kernel32.c), is fixed, so they spread over three by default. */
+    unsigned cores = 3;
+    /* debugging: wsN=value in sh2e.ini overrides variable N (a float when it has a '.', else an integer) */
+    f = fopen("sh2e.ini", "r");
+    while (f && fgets(line, sizeof line, f)) {
+        unsigned n;
+        char val[32];
+        if (sscanf(line, " cores = %u", &n) == 1) cores = n;
+        if (sscanf(line, " FlashlightToggleSFX = %u", &n) == 1) sfx_flashlight = n;
+        if (sscanf(line, " PreserveSoundsOnLoad = %u", &n) == 1) sfx_save_load = n;
+#ifndef SH2_LEAN
+        if (sscanf(line, " trace = %u", &n) == 1) rt_trace = n;  /* debugging: log every bridged call */
+#endif
+        if (sscanf(line, " ws%u = %31s", &n, val) == 2 && n < 160) {
+            if (strchr(val, '.')) ws_setf(WS_VAR(n), (float)atof(val));
+            else MEM32(WS_VAR(n)) = (uint32_t)atoi(val);
+            rt_log("ee: ws%u = %s", n, val);
+        }
+    }
+    if (f) fclose(f);
+    host_use_single_core(cores >= 3 ? -1 : 0);
+#ifdef __APPLE__
+    rt_log("ee: native macOS scheduling, cores=%u (CPU pinning unavailable)", cores);
+#else
+    rt_log("ee: guest threads on %s", cores >= 3 ? "three cores" : "one core");
+#endif
+    rt_log("ee: widescreen %ux%u (4:3 area %d, text offset %.1f)", w, h, (int)w43, toff);
+}
+
+/* Text position hooks (cave i at 0x4011C0 + 8 i, each replacing a few instructions of the game's text
+ * drawing, which they redo before shifting the x87 values by the text offset). The caves run after a
+ * `call`, so the original esp is g_esp + 4. */
+#define ST(i) g_fp_stack[(g_fp_top + (i)) & 7]
+static uint32_t ws_esp(void) { return g_esp + 4; }
+static void ws_addf(uint32_t va, float d) { ws_setf(va, ws_getf(va) + d); }
+static void ws_st0_add(void) { ST(0) = (float)(ST(0) + ws_text()); }
+
+void sub_004011C0(void) {  /* mov [esp+4], edx; movzx edx, word [eax+0xA]; ST(2) += offset */
+    MEM32(ws_esp() + 4) = g_edx;
+    g_edx = MEM16(g_eax + 0xA);
+    ST(2) = (float)(ST(2) + ws_text());
+    g_esp += 4;
+}
+void sub_004011C8(void) {  /* fstp [0x803900]: the speech line's x positions */
+    float t = (float)rt_fpop(), d = ws_text();
+    ws_addf(0x8038B0, d);
+    ws_addf(0x8038E0, d);
+    ws_setf(0x803900, t + d);
+    ws_addf(0x8038C0, d);
+    ws_addf(0x8038D0, d);
+    ws_addf(0x8038F0, d);
+    g_esp += 4;
+}
+void sub_004011D0(void) {  /* mov [esp+0xA8], edx */
+    MEM32(ws_esp() + 0xA8) = g_edx;
+    ws_st0_add();
+    ws_addf(ws_esp() + 0x6C + 4, ws_text());
+    g_esp += 4;
+}
+void sub_004011D8(void) {  /* fst [esp+0x90] */
+    ws_st0_add();
+    ws_setf(ws_esp() + 0x90, (float)ST(0));
+    g_esp += 4;
+}
+void sub_004011E0(void) {  /* fild [height] */
+    ws_addf(ws_esp() + 0x30, ws_text());
+    rt_fpush((double)(int32_t)MEM32(WS_VAR(V_H)));
+    g_esp += 4;
+}
+void sub_004011E8(void) {  /* fst [esp+0x58]; fxch st(1) */
+    ws_st0_add();
+    ws_setf(ws_esp() + 0x58, (float)ST(0));
+    double t = ST(0); ST(0) = ST(1); ST(1) = t;
+    g_esp += 4;
+}
+void sub_004011F0(void) {  /* fild [height] */
+    ws_st0_add();
+    ws_addf(ws_esp() + 0x2C, ws_text());
+    rt_fpush((double)(int32_t)MEM32(WS_VAR(V_H)));
+    g_esp += 4;
+}
+void sub_004011F8(void) {  /* fst [esp+0x40]; fld st(1) */
+    ws_st0_add();
+    ws_setf(ws_esp() + 0x40, (float)ST(0));
+    rt_fpush(ST(1));
+    g_esp += 4;
+}
+void sub_00401200(void) {  /* mov eax, [0xA32894] */
+    g_eax = MEM32(0xA32894u);
+    ws_addf(ws_esp() + 0x7C, ws_text());
+    ws_addf(ws_esp() + 0x90, ws_text());
+    g_esp += 4;
+}
+
+/* Map hooks (caves at 0x401240 + 8 i, see ee_map_scaling). The widening applies while the texture
+ * last loaded is a map one (EE CheckMapTexture). */
+static int map_texture(void) {
+    uint32_t p = MEM32(TEX_NAME_PTR);
+    if (!p) return 0;
+    for (size_t i = 0; i < sizeof ee_texture_list / sizeof *ee_texture_list; i++)
+        if (ee_texture_list[i].map && !strcmp(ee_texture_list[i].name, (const char *)GPTR(p))) return 1;
+    return 0;
+}
+void sub_00401240(void) {  /* map marking x: fmul [0.0625], then / (1 / aspect) */
+    ST(0) = (float)(ST(0) * 0.0625f);
+    ST(0) = (float)(ST(0) / (1.0f / map_aspect));
+    g_esp += 4;
+}
+void sub_00401248(void) {  /* player icon width * aspect; fadd [esp+0x14]; fld [esp+0x18] */
+    ST(0) = (float)(ST(0) * map_aspect);
+    ST(0) = (float)(ST(0) + ws_getf(ws_esp() + 0x14));
+    rt_fpush(ws_getf(ws_esp() + 0x18));
+    g_esp += 4;
+}
+void sub_00401250(void) {  /* player icon x ([ebx]) * aspect; mov eax, [map id] */
+    ws_setf(g_ebx, (float)(ws_getf(g_ebx) * map_aspect));
+    g_eax = MEM32(MAP_ID);
+    g_esp += 4;
+}
+/* These two sit in the full-screen sprite path of 0x49EFE0 (esi = the sprite). A sprite without a texture
+ * is a colour fill, e.g. a cutscene's fade to black: it covers the whole screen, not the 4:3 area. */
+static int32_t fill_pad(void) { return MEM32(g_esi) ? 0 : ((int32_t)ee_res_w - (int32_t)MEM32(WIDTH_VAR)) / 2; }
+void sub_00401258(void) {  /* fadd [esp+0xC]; fadd [esp+0x18]; a map page or a fill is wider */
+    ST(0) = (float)(ST(0) + ws_getf(ws_esp() + 0xC));
+    ST(0) = (float)(ST(0) + ws_getf(ws_esp() + 0x18));
+    if (map_texture()) ST(0) = (float)(ST(0) + map_width);
+    else ST(0) = (float)(ST(0) - 2 * fill_pad());
+    g_esp += 4;
+}
+void sub_00401260(void) {  /* mov eax, [height]; a map page's or a fill's screen x (edx) moves with the widening */
+    if (map_texture()) g_edx = (uint32_t)(int32_t)lrint((map_res_x - map_res_x43) / 2.0 + (int32_t)g_edx);
+    else g_edx += fill_pad();
+    g_eax = MEM32(0x00A33484u);
+    g_esp += 4;
+}
+
+/* FMV subtitles (EE FmvSubtitlesSyncFix): the subtitle frame index in esi is timed for the original
+ * 29.97 fps videos; with a video at another rate (the FMV pack's 60 fps videos) it follows that rate. esi is
+ * the movie loop's pass count, which falls behind the video when bink.c drops late frames (Switch), so
+ * the frame actually shown (LastFrameNum, +0x10) is used instead. */
+#define BINK_HANDLE 0x00932740u   /* the game's BINK * (bink.c's BinkOpen: FrameRate +0x14, FrameRateDiv +0x18) */
+extern void sub_0043DC50_gen(void);
+void sub_0043DC50(void) {
+    uint32_t b = MEM32(BINK_HANDLE);
+    int32_t rate = b ? SMEM32(b + 0x14) : 0, div = b ? SMEM32(b + 0x18) : 0;
+    if (b && MEM32(b + 0x10)) g_esi = MEM32(b + 0x10);
+    if (rate > 0 && div > 0) g_esi = (uint32_t)(int32_t)lrint((int32_t)g_esi * (29.97 / ((double)rate / div)));
+    sub_0043DC50_gen();
+}
+
+/* ---- Extra sounds (EE PlayWavSound.cpp): the WAVs in sh2e/sound/extra, played on the host so loading
+ * or saving does not cut them off. ---- */
+#define SFX_VOLUME      0x00A3347Cu  /* 0..15 */
+#define PAUSE_MENU_ITEM 0x009326B4u  /* 1: Save Game */
+#define FLASHLIGHT_ON   0x01F7A806u
+#define CUTSCENE_ID     0x01F7A7C4u
+#define WORLD_COLOR     0x00942C50u  /* R, G, B */
+#define INVENTORY_ITEM  0x01F7A7E2u
+void ds_play_wav(const char *path, int slot, float gain);  /* dsound.c */
+static char wav_save[512], wav_load[512], wav_light_on[512], wav_light_off[512];
+
+static int extra_wav(const char *name, char *out) {
+    char rel[64];
+    struct stat st;
+    snprintf(rel, sizeof rel, "sh2e/sound/extra/%s", name);
+    rt_path(rel, out, 512);
+    return stat(out, &st) == 0;
+}
+static float sfx_gain(void) {  /* EE useSfxVolume: the game's sound effect volume */
+    static const int db[16] = {-10000, -2401, -1799, -1411, -1170, -961, -809, -665, -555, -445, -359, -270, -198, -124, -63, 0};
+    uint8_t v = MEM8(SFX_VOLUME);
+    return v < 16 ? powf(10.0f, db[v] / 2000.0f) : 1.0f;
+}
+static void ee_extra_sounds_init(void) {
+    sfx_save_load = sfx_save_load && extra_wav("save_sound.wav", wav_save) && extra_wav("g_start.wav", wav_load);
+    sfx_flashlight = sfx_flashlight && extra_wav("flashlight_on.wav", wav_light_on) && extra_wav("flashlight_off.wav", wav_light_off);
+    rt_log("ee: extra sounds: save/load %s, flashlight %s", sfx_save_load ? "on" : "off", sfx_flashlight ? "on" : "off");
+}
+/* Caves 0x401268 / 0x401270 / 0x401278 replace `call 0x515580` (play sound effect; cdecl, the caller pops
+ * the id, volume and flags): the load sound (title Continue, New Game, pause menu Load), the save sound at
+ * a save point, and the pause menu's confirm sound, which is the save sound on Save Game. */
+static void sfx_call(const char *wav, int slot) {
+    if (!sfx_save_load) { rt_resolve(0x00515580u)(); return; }  /* same stack and return address */
+    ds_play_wav(wav, slot, sfx_gain());
+    g_eax = 0x10;  /* PlaySound succeeded */
+    g_esp += 4;
+}
+void sub_00401268(void) { sfx_call(wav_load, 1); }
+void sub_00401270(void) { sfx_call(wav_save, 0); }
+void sub_00401278(void) {
+    if (MEM8(PAUSE_MENU_ITEM) == 1) sfx_call(wav_save, 0);
+    else rt_resolve(0x00515580u)();
+}
+
+/* EE RunPlayFlashlightSounds: a click when James switches the flashlight, where the game itself is silent. */
+static void ee_flashlight_sound(void) {
+    static uint32_t last_room;
+    static uint8_t last_on;
+    static int boss;
+    uint32_t room = MEM32(EE_ROOM_ID);
+    uint8_t on = MEM8(FLASHLIGHT_ON);
+    int never = room == 0x24 || room == 0x89 || room == 0x8F || room == 0x90;
+    int always = room == 0x65 || (room >= 0xAA && room <= 0xBB);  /* bug room, Otherworld hotel, final boss */
+    if (room == 0xBB && MEM32(CUTSCENE_ID) != 0) boss = 1;
+    else if (boss && room != 0xBB) boss = 0;
+    if (sfx_flashlight && on != last_on && room == last_room && !never && !boss &&
+        (always || (MEM8(0x01F7DC2Cu) == 1 && MEM8(0x01F7AE80u) == 0 && room != 0xA2) ||
+         ((room == 0x04 || room == 0x08) && !MEM8(WORLD_COLOR) && !MEM8(WORLD_COLOR + 1) && !MEM8(WORLD_COLOR + 2)) ||
+         (room == 0xA2 && MEM8(INVENTORY_ITEM) < 0x80)))
+        ds_play_wav(on ? wav_light_on : wav_light_off, 2, sfx_gain());
+    last_room = room;
+    last_on = on;
+}
+
+/* ---- Custom fonts (EE Patches/Fonts.cpp, PatchCustomFonts) ----
+ * The game draws text from a glyph cache texture: 0x4809F0 decodes the built-in font's glyph of a
+ * character into a free cell of a 25x17 grid of 22x32 cells (550x544). EE fills the cells from
+ * font000.png instead, 44x64 per glyph: sharper text, and the glyphs the built-in font lacks (Japanese,
+ * or a translation's own letters, e.g. Russian from a `lang` folder). The cache texture grows to 25x17 of
+ * the file's cells; the UVs are fractions of the 550x544 layout, so the drawing code is unchanged. */
+#define FONT_TYPE 0x01F5F520u  /* 0 normal, 1 small */
+#define FONT_DATA 0x008038A0u  /* per type: the built-in font (width table of 0xE0 at +0x10) */
+#define FONT_SLOT 0x01F5FEC0u
+static uint8_t *font_px;  /* gray + alpha: the fonts are white glyphs on alpha */
+static int font_w, font_h, font_cw, font_ch, font_glyphs;
+
+static int font_decode(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    uint8_t *buf = calloc(1, n + AV_INPUT_BUFFER_PADDING_SIZE);
+    fseek(f, 0, SEEK_SET);
+    n = buf ? (long)fread(buf, 1, n, f) : 0;
+    fclose(f);
+    const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_PNG);
+    AVCodecContext *ctx = codec ? avcodec_alloc_context3(codec) : NULL;
+    AVPacket *pkt = av_packet_alloc();
+    AVFrame *fr = av_frame_alloc();
+    if (n > 16 && ctx && pkt && fr && avcodec_open2(ctx, codec, NULL) == 0) {
+        pkt->data = buf;
+        pkt->size = (int)n;
+        if (avcodec_send_packet(ctx, pkt) == 0 && avcodec_receive_frame(ctx, fr) == 0 &&
+            (fr->format == AV_PIX_FMT_RGBA || fr->format == AV_PIX_FMT_YA8)) {
+            int bpp = fr->format == AV_PIX_FMT_RGBA ? 4 : 2;
+            font_w = fr->width;
+            font_h = fr->height;
+            int cols = font_w / 44, rows = font_h / 64;
+            if (!memcmp(buf + n - 16, "SH2EEFNT", 8)) {  /* EE's trailer: the grid when cells are not 44x64 */
+                memcpy(&cols, buf + n - 8, 4);
+                memcpy(&rows, buf + n - 4, 4);
+            }
+            if (cols > 0 && rows > 1 && (font_px = malloc((size_t)font_w * font_h * 2))) {
+                font_cw = font_w / cols;
+                font_ch = font_h / rows;
+                font_glyphs = cols * rows / 2;  /* the small font is the bottom half */
+                for (int y = 0; y < font_h; y++)
+                    for (int x = 0; x < font_w; x++) {
+                        const uint8_t *s = fr->data[0] + (size_t)y * fr->linesize[0] + x * bpp;
+                        font_px[((size_t)y * font_w + x) * 2] = s[bpp == 4];  /* G of RGBA, Y of YA */
+                        font_px[((size_t)y * font_w + x) * 2 + 1] = s[bpp - 1];
+                    }
+            }
+        } else
+            rt_log("ee: font: %s is not an 8-bit RGBA or gray + alpha PNG", path);
+    }
+    av_frame_free(&fr);
+    av_packet_free(&pkt);
+    avcodec_free_context(&ctx);
+    free(buf);
+    return font_px != NULL;
+}
+
+static void ee_fonts_init(void) {
+    char rel[64], host[512];
+    for (int j = ee_russian_text() ? 0 : 4; j >= 0 && !font_px; j--) {  /* Translation owns its font. */
+        snprintf(rel, sizeof rel, "data/font/font%03d.png", j);
+        if (!font_decode(rt_path(rel, host, sizeof host))) continue;
+        rt_log("ee: font %s: %dx%d, %dx%d cells", host, font_w, font_h, font_cw, font_ch);
+        snprintf(rel, sizeof rel, "data/font/fontwdata%03d.bin", j);
+        FILE *f = fopen(rt_path(rel, host, sizeof host), "rb");
+        if (!f) f = fopen(rt_path("data/font/fontwdata.bin", host, sizeof host), "rb");
+        uint8_t wd[2 * 0xE0];
+        if (f && fread(wd, 1, sizeof wd, f) == sizeof wd)  /* glyph widths of 0x00-0xDF, normal then small */
+            for (int t = 0; t < 2; t++) memcpy(GPTR(MEM32(FONT_DATA + 4 * t) + 0x10), wd + 0xE0 * t, 0xE0);
+        if (f) fclose(f);
+    }
+}
+
+/* Cave 0x401280, at 0x480A0A where the glyph cache texture is sized (ecx width, eax height). */
+void sub_00401280(void) {
+    uint32_t w = font_px ? 25 * font_cw : 550, h = font_px ? 17 * font_ch : 544;
+    float one = 1.0f;
+    g_ecx = w;
+    g_eax = h;
+    MEM32(0x00943944u) = w;
+    MEM32(0x00943948u) = h;
+    memcpy(GPTR(0x0094394Cu), &one, 4);  /* UV scales */
+    memcpy(GPTR(0x00943950u), &one, 4);
+    g_esp += 4;
+}
+
+/* Cave 0x401288, at 0x480C79 once the glyph's cell (dx) is chosen and the texture locked: EE's
+ * UpdateFontTexture. eax negative: the glyph is copied from the font file, go unlock and return;
+ * else eax and EE_FONT_DATA (ebp is a local of the lifted caller) as the replaced instructions left them. */
+#define EE_FONT_DATA 0x0EC01010u
+void sub_00401288(void) {
+    uint32_t frame = g_esp + 4, type = MEM32(FONT_TYPE) & 1;
+    int slot = (int16_t)g_edx;
+    MEM16(FONT_SLOT) = (uint16_t)slot;
+    g_eax = MEM32(FONT_TYPE);
+    MEM32(EE_FONT_DATA) = MEM32(FONT_DATA + 4 * g_eax);
+    if (font_px) {
+        uint32_t pitch = MEM32(frame + 0x2C), id = MEM16(frame + 0x38);  /* D3DLOCKED_RECT, the character */
+        int cols = font_w / font_cw;
+        if ((int)id >= font_glyphs) id = 0;
+        uint8_t *out = (uint8_t *)GPTR(MEM32(frame + 0x30)) + (size_t)(slot / 25) * pitch * font_ch + slot % 25 * font_cw * 4;
+        const uint8_t *in = font_px + ((size_t)type * (font_h / 2) * font_w + (size_t)(id / cols) * font_ch * font_w +
+                                       id % cols * font_cw) * 2;
+        for (int y = 0; y < font_ch; y++, out += pitch, in += (size_t)font_w * 2)
+            for (int x = 0; x < font_cw; x++) {
+                out[4 * x] = out[4 * x + 1] = out[4 * x + 2] = in[2 * x];
+                out[4 * x + 3] = in[2 * x + 1];
+            }
+        g_eax = 0x80000000u;
+    }
+    g_esp += 4;
+}
+
+/* Called once after sh2pc.exe is loaded. */
+void ee_init(void) {
+    ee_language_init();
+    host_arena_commit(TEX_BUF1, TEX_BUF3 + 2 * TEX_SIZE - TEX_BUF1);
+    host_arena_commit(TITLE_PATHS, 0x10000);
+    ee_sfx_init();
+    ee_widescreen_init();
+#ifndef __SWITCH__
+    ee60_init();
+#endif
+    ee_extra_sounds_init();
+    ee_fonts_init();
+    ee_map_scaling(1024, 1024);
+    float one = 1.0f;
+    memcpy(GPTR(0x0EC01000u), &one, 4);  /* texture scale X/Y (FullscreenImages) */
+    memcpy(GPTR(0x0EC01004u), &one, 4);
+    /* The game writes SET DX_CONFIG_SAFE_MODE 1 at start and removes it on a clean exit; anything else
+     * means "it crashed", and the next start falls back to 640x480 safe graphics. On the Switch the
+     * normal way out is HOME, so the flag is dropped before the game reads it. */
+    FILE *f = fopen("settings.ini", "rb");
+    if (f) {
+        char buf[4096], out[4096];
+        size_t n = fread(buf, 1, sizeof buf - 1, f), o = 0;
+        fclose(f);
+        buf[n] = 0;
+        for (char *line = strtok(buf, "\n"); line; line = strtok(NULL, "\n"))
+            if (!strstr(line, "DX_CONFIG_SAFE_MODE")) o += snprintf(out + o, sizeof out - o, "%s\n", line);
+        if ((f = fopen("settings.ini", "wb"))) { fwrite(out, 1, o, f); fclose(f); }
+    }
+    rt_log("ee: texture buffers at %08X/%08X/%08X", TEX_BUF1, TEX_BUF2, TEX_BUF3);
+    /* Start00Scaling, data half (the code half is in tools/patch_exe.py): the save screen background
+     * position and width, whose stores are NOPed, and the title logo highlight, for 2732x2048 art. */
+    *(uint16_t *)GPTR(0x0093C940u) = 5464;                 /* save screen pos X: 4096 * 2732/2048 */
+    *(uint16_t *)GPTR(0x0093C93Cu) = 61440 - (5464 - 4096); /* save screen width */
+    *(uint16_t *)GPTR(0x0088BC4Au) = 126;                  /* title logo highlight Y */
+}
+
+/* ---- MainMenu (EE Patches/MainMenu.cpp, PatchMainMenuTitlePerLang) ----
+ * Cave 0x401D60, called from 0x496F30 in place of `xor esi, esi; or eax, -1`: points the title menu
+ * texture (the TexPath at 0x7BA838) at start01<lang>.tex when that file exists, then reloads the
+ * messages as EE's MainMenuTitleASM does. */
+void sub_00401D60(void) {
+    static const char langs[] = "jefgis";  /* the game's language index (0x1DBC006) */
+    uint8_t lang = MEM8(0x01DBC006u);
+    char guest[64], host[512];
+    struct stat st;
+    snprintf(guest, sizeof guest, "data/pic/etc/start01%c.tex", lang < 6 ? langs[lang] : 'e');
+    if (stat(rt_path(guest, host, sizeof host), &st) == 0) {
+        strcpy(GPTR(TITLE_PATHS), guest);
+        MEM32(TITLE_TEXPATH) = TITLE_PATHS;
+        rt_log("ee: title menu %s", host);
+    }
+    uint32_t zero = 0;
+    guest_call(0x004457C0u, 1, &zero, 0);  /* LoadMes(0) */
+    g_esi = 0;
+    g_eax = 0xFFFFFFFFu;
+    g_esp += 4;
+}
+
+/* Desktop uses SDL's visible system cursor, matching the actual window coordinates.
+ * Keep the guest knife hidden to avoid drawing two cursors. */
+extern void sub_0045A6D0_gen(void);
+void sub_0045A6D0(void) {
+    g_esp += 4;
+}
+
+/* Only the movie's known XYZRHW quad (0x43E3E9) is resized. Decoder timing,
+ * subtitles, other UI geometry and texture coordinates remain the game's. */
+void ee_movie_vertices(uint32_t vertices, uint32_t width, uint32_t height) {
+    if (vertices != 0x00932888u) return;
+    uint32_t b = MEM32(0x00932740u);
+    if (!b || !width || !height || !MEM32(b) || !MEM32(b + 4)) return;
+    static int mode = -1;
+    if (mode < 0) mode = rt_option_int("movie_scale", 2); /* 1 fit; 2 fill/crop, no distortion */
+    if (!mode) return;
+    float sx = (float)width / MEM32(b), sy = (float)height / MEM32(b + 4);
+    float scale = mode == 1 ? fminf(sx, sy) : fmaxf(sx, sy);
+    float dw = MEM32(b) * scale, dh = MEM32(b + 4) * scale;
+    float left = (width - dw) * 0.5f - 0.5f, top = (height - dh) * 0.5f - 0.5f;
+    for (int i = 0; i < 4; i++) {
+        ws_setf(vertices + i * 24, left + (i & 1 ? dw : 0));
+        ws_setf(vertices + i * 24 + 4, top + (i & 2 ? dh : 0));
+    }
+}
+
+/* ---- vibration (EE Wrappers/dinput8/IDirectInputEffect.cpp, RestoreVibration) ---- */
+
+/* CreateDirectInputGamepad: a pad that created an effect is driven as a rumble pad (type 2). */
+extern void sub_00458760_gen(void);
+void sub_00458760(void) {
+    sub_00458760_gen();
+    if (MEM32(EE_GAMEPAD_TYPE) != 0) MEM32(EE_GAMEPAD_TYPE) = 2;
+}
+
+/* Strength follows the game's own Vibration option. Called by the DirectInput effect bridge. */
+uint32_t ee_rumble_gain(uint32_t magnitude) {
+    uint8_t level = MEM8(EE_VIBRATION_LEVEL);
+    if (level >= 3) return magnitude ? 10000 : 0;
+    return magnitude ? 10000u * level / 3u : 0;
+}
+
+void dinput_rumble_stop(void);
+
+
+/* ---- save debugging: the return value of the save module's functions, logged when it changes (sh2.log) ---- */
+static void save_log(uint32_t fn, uint32_t eax, uint32_t edx, uint32_t from) {
+    static struct { uint32_t fn, eax, edx; } last[32];
+    int i = 0;
+    while (i < 32 && last[i].fn && last[i].fn != fn) i++;
+    if (i == 32) return;
+    if (last[i].fn == fn && last[i].eax == eax && last[i].edx == edx) return;
+    last[i].fn = fn; last[i].eax = eax; last[i].edx = edx;
+    rt_log("save: fn %08X -> eax=%08X edx=%08X (from %08X)", fn, eax, edx, from);
+}
+
+extern void sub_0044D2B0_gen(void);
+void sub_0044D2B0(void) {
+    uint32_t from = MEM32(g_esp);
+    /* the 0xC00-byte sh2pc.sys buffer as the validator sees it */
+    const uint8_t *b = GPTR(0x00933608u);
+    uint32_t h = 2166136261u;
+    for (int i = 0; i < 0xC00; i++) h = (h ^ b[i]) * 16777619u;
+    rt_log("save: sys buffer fnv=%08X head %02X%02X%02X%02X%02X%02X%02X%02X tail %02X%02X%02X%02X%02X%02X%02X%02X hdr@1c=%08X", h,
+           b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[0xBF8], b[0xBF9], b[0xBFA], b[0xBFB], b[0xBFC], b[0xBFD], b[0xBFE], b[0xBFF],
+           *(const uint32_t *)(b + 0x1C));
+    int lead = 0, nz = 0;
+    while (lead < 0xC00 && !b[lead]) lead++;
+    for (int i = 0; i < 0xC00; i++) nz += b[i] != 0;
+    rt_log("save: sys buffer leading zeros %d, nonzero bytes %d, bytes 0x40..: %02X%02X%02X%02X%02X%02X%02X%02X", lead, nz, b[0x40], b[0x41], b[0x42], b[0x43], b[0x44], b[0x45], b[0x46], b[0x47]);
+    sub_0044D2B0_gen();
+    save_log(0x0044D2B0, g_eax, g_edx, from);
+}
+extern void sub_0044D520_gen(void);
+void sub_0044D520(void) { uint32_t from = MEM32(g_esp); sub_0044D520_gen(); save_log(0x0044D520, g_eax, g_edx, from); }
+extern void sub_0044DE20_gen(void);
+void sub_0044DE20(void) { uint32_t from = MEM32(g_esp); sub_0044DE20_gen(); save_log(0x0044DE20, g_eax, g_edx, from); }
+extern void sub_0044EDA0_gen(void);
+void sub_0044EDA0(void) { uint32_t from = MEM32(g_esp); sub_0044EDA0_gen(); save_log(0x0044EDA0, g_eax, g_edx, from); }
+extern void sub_0044F270_gen(void);
+void sub_0044F270(void) { uint32_t from = MEM32(g_esp); sub_0044F270_gen(); save_log(0x0044F270, g_eax, g_edx, from); }
+extern void sub_004512B0_gen(void);
+void sub_004512B0(void) { uint32_t from = MEM32(g_esp); sub_004512B0_gen(); save_log(0x004512B0, g_eax, g_edx, from); }
+extern void sub_00450E70_gen(void);
+void sub_00450E70(void) { uint32_t from = MEM32(g_esp); sub_00450E70_gen(); save_log(0x00450E70, g_eax, g_edx, from); }
+extern void sub_00450AB0_gen(void);
+void sub_00450AB0(void) { uint32_t from = MEM32(g_esp); sub_00450AB0_gen(); save_log(0x00450AB0, g_eax, g_edx, from); }
+extern void sub_00451850_gen(void);
+void sub_00451850(void) { uint32_t from = MEM32(g_esp); sub_00451850_gen(); save_log(0x00451850, g_eax, g_edx, from); }
+extern void sub_00456530_gen(void);
+void sub_00456530(void) { uint32_t from = MEM32(g_esp); sub_00456530_gen(); save_log(0x00456530, g_eax, g_edx, from); }
+extern void sub_004565F0_gen(void);
+void sub_004565F0(void) { uint32_t from = MEM32(g_esp); sub_004565F0_gen(); save_log(0x004565F0, g_eax, g_edx, from); }
+extern void sub_00456C00_gen(void);
+void sub_00456C00(void) { uint32_t from = MEM32(g_esp); sub_00456C00_gen(); save_log(0x00456C00, g_eax, g_edx, from); }
+extern void sub_00456CE0_gen(void);
+void sub_00456CE0(void) { uint32_t from = MEM32(g_esp); sub_00456CE0_gen(); save_log(0x00456CE0, g_eax, g_edx, from); }
+extern void sub_00456EE0_gen(void);
+void sub_00456EE0(void) { uint32_t from = MEM32(g_esp); sub_00456EE0_gen(); save_log(0x00456EE0, g_eax, g_edx, from); }
+extern void sub_004570B0_gen(void);
+void sub_004570B0(void) { uint32_t from = MEM32(g_esp); sub_004570B0_gen(); save_log(0x004570B0, g_eax, g_edx, from); }
+extern void sub_00455660_gen(void);
+void sub_00455660(void) { uint32_t from = MEM32(g_esp); sub_00455660_gen(); save_log(0x00455660, g_eax, g_edx, from); }
+extern void sub_004567B0_gen(void);
+void sub_004567B0(void) { uint32_t from = MEM32(g_esp); sub_004567B0_gen(); save_log(0x004567B0, g_eax, g_edx, from); }
+
+/* recomp_lookup_manual: every call the recompiler routed through the manual table lands here. */
+recomp_func_t ee_lookup_manual(uint32_t va) {
+    switch (va) {
+#ifndef __SWITCH__
+    case 0x0055F990u: return cri_enter;
+    case 0x0055F9E0u: return cri_leave;
+#endif
+    case 0x00458060u: return sub_00458060;
+    case 0x00534660u: return sub_00534660;
+    case 0x00458760u: return sub_00458760;
+    case 0x0045A6D0u: return sub_0045A6D0;
+    case 0x00401970u: return sub_00401970;
+    case 0x004494A0u: return sub_004494A0;
+    case 0x00401D60u: return sub_00401D60;
+    case 0x00401460u: return sub_00401460;
+    case 0x004015D0u: return sub_004015D0;
+    case 0x0044D2B0u: return sub_0044D2B0;
+    case 0x0044D520u: return sub_0044D520;
+    case 0x0044DE20u: return sub_0044DE20;
+    case 0x0044EDA0u: return sub_0044EDA0;
+    case 0x0044F270u: return sub_0044F270;
+    case 0x004512B0u: return sub_004512B0;
+    case 0x00450E70u: return sub_00450E70;
+    case 0x00450AB0u: return sub_00450AB0;
+    case 0x00451850u: return sub_00451850;
+    case 0x00456530u: return sub_00456530;
+    case 0x004565F0u: return sub_004565F0;
+    case 0x00456C00u: return sub_00456C00;
+    case 0x00456CE0u: return sub_00456CE0;
+    case 0x00456EE0u: return sub_00456EE0;
+    case 0x004570B0u: return sub_004570B0;
+    case 0x00455660u: return sub_00455660;
+    case 0x004567B0u: return sub_004567B0;
+    case 0x004011C0u: return sub_004011C0;
+    case 0x004011C8u: return sub_004011C8;
+    case 0x004011D0u: return sub_004011D0;
+    case 0x004011D8u: return sub_004011D8;
+    case 0x004011E0u: return sub_004011E0;
+    case 0x004011E8u: return sub_004011E8;
+    case 0x004011F0u: return sub_004011F0;
+    case 0x004011F8u: return sub_004011F8;
+    case 0x00401200u: return sub_00401200;
+    case 0x00401240u: return sub_00401240;
+    case 0x00401248u: return sub_00401248;
+    case 0x00401250u: return sub_00401250;
+    case 0x00401258u: return sub_00401258;
+    case 0x00401260u: return sub_00401260;
+    case 0x00401268u: return sub_00401268;
+    case 0x00401270u: return sub_00401270;
+    case 0x00401278u: return sub_00401278;
+    case 0x0043DC50u: return sub_0043DC50;
+    }
+    return NULL;
+}
+
+/* Once per presented frame: no rumble outside gameplay, in a fade or between rooms (EE's
+ * RunInfiniteRumbleFix). */
+void ee_frame(void) {
+    /* The stock limiter uses QPC ticks; its measured seconds/frame and 60-Hz logic
+     * steps are left intact. Never multiply QPC time: audio and videos keep real time.
+     * 60 is opt-in; scene-specific timing adapters are selected separately. */
+    if (desktop_fps == 60) {
+        uint64_t frequency;
+        memcpy(&frequency, GPTR(0x00A33348u), sizeof frequency);
+        if (frequency) {
+            uint64_t period = frequency / 60;
+            memcpy(GPTR(0x00A33350u), &period, sizeof period);
+        }
+    }
+    ee_mouse_menu();
+    static int blocked;
+    int block = MEM8(EE_EVENT_INDEX) != EVENT_IN_GAME || MEM32(EE_ROOM_ID) == R_NONE ||
+                MEM32(EE_TRANSITION_STATE) != FADE_NONE;
+    if (block && !blocked) {
+        MEM8(EE_RUMBLE_FLAG) = 0;
+        if (MEM32(EE_TRANSITION_STATE) != FADE_NONE) dinput_rumble_stop();
+    } else if (!block && blocked)
+        MEM8(EE_RUMBLE_FLAG) = 1;
+    blocked = block;
+
+    ee_flashlight_sound();
+
+    /* SaveBGImage (EE RunSaveBGImage): back at the main menu, the chapter is the main scenario. */
+    static uint8_t last_menu;
+    uint8_t menu = MEM8(EE_MENU_EVENT);
+    if (last_menu != 7 && menu == 7) MEM8(0x01DBC00Cu) = 0;  /* MENU_MAIN_MENU, CHAPTER_MAIN_SCENARIO */
+    last_menu = menu;
+}
