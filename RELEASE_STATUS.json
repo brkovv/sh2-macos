@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "distribution": "public-source-prerelease",
   "target_repository": "brkovv/sh2-macos",
   "upstream_redistribution_permission": true,
@@ -12,5 +12,10 @@
   "dmg_creation_verified": false,
   "license": "MIT",
   "third_party_notices_reviewed": true,
-  "prerelease": true
+  "prerelease": true,
+  "managed_installer": true,
+  "automatic_dependency_setup": true,
+  "explicit_github_updater": true,
+  "owned_uninstaller": true,
+  "actual_mac_managed_install_test": false
 }

@@ -1,25 +1,42 @@
-# Installation / РЈСЃС‚Р°РЅРѕРІРєР°
+# Install / Установка
 
-This is a experimental source-installer alpha, not a stable prebuilt game.
+Download the Source-Installer ZIP from this repository's Releases, extract it,
+then open Install-SH2.command. Start-SH2.command is also a setup/launch entry point.
+Requires Apple Silicon, macOS 15+, internet and your own supported PC/EE game.
 
-Extract the Source-Installer ZIP and open Start-SH2.command. It runs in
-Terminal and requires macOS 15+, Apple Silicon, Apple Command Line Tools and
-Homebrew. The installer installs the remaining build dependencies. No prebuilt
-game or tested binary app/DMG is included in this alpha.
+The installer places its app in ~/Applications/Silent Hill 2.app and creates Start,
+Update and Uninstall Silent Hill 2.command shortcuts in ~/Applications. You can
+remove the extracted ZIP folder once setup completes. Sources, game copy, builds,
+logs and isolated Python environment live separately under:
 
-Select your PC/Enhanced Edition game folder. The complete supported executable
-is checked before import. Your own data is copied to a separate writable location;
-the original installation is left alone. Source generation and compilation happen
-locally on the first run. An existing translated installation is imported too.
-
-If you previously used the private Mac kit, its game folder can be selected:
-~/Library/Application Support/SH2-Recomp/2b7a75bcb3a601b9/game
-
-Runtime data, source cache, logs and backups are separate from the app:
 ~/Library/Application Support/SH2-brkovv/
 
-Moving the app or mounting a read-only DMG must not move or erase saves. Keep
-game/data/save and backups when reinstalling. To remove the app, remove the app
-bundle; the separate game folder remains until you deliberately remove it.
+It starts missing Apple Command Line Tools setup, waits up to 20 minutes for the
+SDK, and runs a pinned, SHA-256-verified official Homebrew installer if necessary.
+Apple/Homebrew may require a password, confirmation or completing a system dialog.
+It installs cmake, ninja, pkgconf, Python 3.12, SDL2, FFmpeg and isolated Capstone.
+It never disables macOS security protections. On interruption, rerun the installer.
 
-Actual app launch on macOS, signing and notarization are not verified here.
+Select your own PC/EE game folder once; the executable hash and required resources
+are checked before import. If the old SH2-Recomp private-kit game folder exists,
+it is selected automatically. The original is copied, not modified. An existing
+alpha.3 default data folder is reused after validation. Settings/saves are backed
+up before defaults/build. Existing explicit settings remain in effect.
+
+For a custom **data** directory on first install, use Terminal:
+
+```sh
+bash /path/to/Install-SH2.command --base "$HOME/Games/SH2-data"
+```
+
+The directory must be dedicated to SH2, empty or already owned by this installer.
+Do not select the original game folder. The selected path is remembered. Moving
+an existing installation between data paths is not automated in this alpha.
+
+Generation/build progress is visible; details are in the data folder's logs.
+Use --no-launch to install/build without starting the game. After an error the
+bootstrap log is printed; after initialization it is also copied into logs.
+
+**Experimental:** actual clean Mac installation, app/LaunchServices, Homebrew/Apple
+dialogs and game execution through this new manager have not been tested on a Mac.
+Linux lifecycle tests are reported separately; they do not establish Apple support.

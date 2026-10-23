@@ -7,5 +7,13 @@
   "game_binary_sha256": "07d3f95a6a1c3d6c630ace26aea02a4ec4efc4c8d67bdbff32456d7cddea8b9e",
   "runtime_seconds": 95.07,
   "intro_settings_credits_game_passed": true,
-  "actual_mac_execution": false
+  "actual_mac_execution": false,
+  "managed_installer": {
+    "linux_lifecycle_tests": true,
+    "tests": 12,
+    "actual_mac_install": false,
+    "actual_mac_uninstall": false,
+    "actual_mac_update": false,
+    "source_runtime_unchanged": true
+  }
 }

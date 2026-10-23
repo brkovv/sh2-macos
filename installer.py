@@ -34,7 +34,8 @@ def verify_source(package):
         target=source.joinpath(*p.parts)
         if target.resolve()!=target or not target.is_file() or sha(target)!=digest:
             raise RuntimeError('Исходник повреждён или заменён ссылкой: '+relative)
-    found={p.relative_to(source).as_posix() for p in source.rglob('*') if p.is_file() or p.is_symlink()}
+    found={p.relative_to(source).as_posix() for p in source.rglob('*') if (p.is_file() or p.is_symlink()) and not
+           (p.name=='.DS_Store' and p.is_file() and not p.is_symlink() and p.stat().st_size<=65536)}
     if found!=set(manifest['files']):raise RuntimeError('Неизвестные файлы в исходном комплекте.')
     return manifest,sha(package/'SOURCE-MANIFEST.json')
 
@@ -86,7 +87,10 @@ def defaults(game):
 
 def prepare_source(package,base):
     manifest,digest=verify_source(package)
-    source=base/'versions'/(manifest['version']+'-'+digest[:16])/'source'
+    # Packaging-only updates share one verified source/build cache.
+    identity=dict(files=manifest['files'],exe=EXPECTED_EXE,capstone='5.0.7',flags='-fwrapv -fno-strict-aliasing')
+    digest=hashlib.sha256(json.dumps(identity,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    source=base/'versions'/('source-'+digest[:16])/'source'
     if source.parent.resolve()!=source.parent:raise RuntimeError('Ссылка вместо папки установленных версий.')
     if source.exists():
         for relative,expected in manifest['files'].items():
@@ -106,7 +110,18 @@ def prepare_source(package,base):
 def run_logged(args,source,env,path):
     print(' '.join(map(str,args)),flush=True)
     with path.open('wb') as log:
-        code=subprocess.run(list(map(str,args)),cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT).returncode
+        process=subprocess.Popen(list(map(str,args)),cwd=source,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+        try:
+            for line in iter(process.stdout.readline,b''):
+                log.write(line);log.flush()
+                print(line.decode('utf-8',errors='replace'),end='',flush=True)
+            code=process.wait()
+        except BaseException:
+            process.terminate()
+            try:process.wait(timeout=10)
+            except subprocess.TimeoutExpired:process.kill();process.wait()
+            raise
+        finally:process.stdout.close()
     if code:raise RuntimeError(f'Этап завершился кодом {code}. Лог: {path}')
 
 def main():
@@ -115,6 +130,7 @@ def main():
     parser.add_argument('--base',type=Path,default=Path.home()/'Library/Application Support/SH2-brkovv')
     parser.add_argument('--validate-only',action='store_true')
     parser.add_argument('--russian',action='store_true')
+    parser.add_argument('--no-launch',action='store_true',help='Prepare and build without starting the game.')
     args=parser.parse_args();package=Path(__file__).resolve().parent
     verify_source(package)
     if args.validate_only:
@@ -127,6 +143,7 @@ def main():
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:raise RuntimeError('Установка или игра уже открыты.')
         lock.write(str(os.getpid()));lock.flush()
+        if (base/'game').is_symlink():raise RuntimeError('Ссылка вместо установленной игровой папки.')
         game=validate_game(base/'game') if (base/'game').exists() else import_game(args.game,base) if args.game else None
         if game is None:parser.error('Выберите свою папку игры с Enhanced Edition.')
         backup=snapshot(game,base);print('Резервная копия настроек/сохранений: '+str(backup),flush=True)
@@ -141,12 +158,20 @@ def main():
         env=dict(os.environ,SH2_PYTHON=sys.executable,SH2_JOBS=os.environ.get('SH2_JOBS','2'))
         marker=source.parent/'generated.json'
         generated=dict(source_manifest=digest,exe=EXPECTED_EXE,capstone='5.0.7')
+        print('4/5 Подготавливаем код (готовый кэш будет использован повторно)…',flush=True)
         if not marker.is_file() or json.loads(marker.read_text())!=generated or not (source/'src/recomp/gen/recomp_dispatch.c').is_file():
             import capstone
             if capstone.__version__!='5.0.7':raise RuntimeError('Нужен capstone 5.0.7 в изолированной среде установщика.')
             run_logged(['sh','tools/regen.sh'],source,env,logdir/'generate.log')
             marker.write_text(json.dumps(generated,indent=2)+'\n')
+        print('5/5 Собираем нативную версию…',flush=True)
         run_logged(['sh','tools/build-macos.sh'],source,env,logdir/'build.log')
+        status=dict(package_version=json.loads((package/'SOURCE-MANIFEST.json').read_text())['version'],
+            build_completed=True,source_identity=digest,source=str(source),game_launch_verified=False)
+        (base/'runtime-status.json').write_text(json.dumps(status,indent=2)+'\n')
+        if args.no_launch:
+            print('Установка и сборка завершены. Запуск: ~/Applications/Silent Hill 2.app',flush=True)
+            return
         print('Сборка завершена. Запускаем игру. Логи: '+str(logdir),flush=True)
         # The existing native runner snapshots again and records actual Mac diagnostics.
         result=subprocess.run([sys.executable,str(source/'tools/test-macos.py'),str(game),'--logs-dir',str(logdir)],env=env)

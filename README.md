@@ -10,7 +10,7 @@ Built on [cutarev/sh2-nx](https://github.com/cutarev/sh2-nx) and its embedded xb
 [Installation](docs/INSTALLATION.md) · [Building](docs/BUILDING.md) ·
 [Report a bug](https://github.com/brkovv/sh2-macos/issues) · [Telegram](https://t.me/brkovv)
 
-**0.1.0-alpha.3 · Native ARM64 · Source installer · MIT**
+**0.1.0-alpha.4 · Native ARM64 · Source installer · MIT**
 
 </div>
 
@@ -37,7 +37,10 @@ movies or other game resources are included. This is an unofficial fan project.
 - Keyboard/gamepad support and preservation of existing key mappings.
 - Optional Russian text through the credited Metallist/Hellbringer/ilyuXer pack.
 - Title art and fonts loaded from your own installation.
-- Separate writable game copy, local logs and configuration/save backups.
+- Automatic installation into ~/Applications with separate writable game data.
+- One-command GitHub updates with archive verification and app replacement rollback.
+- Uninstaller with keep-saves and complete-removal modes.
+- Shared source/build cache and visible generation/build progress.
 
 ## Requirements
 
@@ -45,7 +48,7 @@ movies or other game resources are included. This is an unofficial fan project.
 | --- | --- |
 | Mac | Apple Silicon / ARM64; macOS 15 or newer, experimental target |
 | Apple tools | Command Line Tools (`xcode-select --install`) |
-| Dependencies | [Homebrew](https://brew.sh); remaining libraries installed by the launcher |
+| Dependencies | Missing [Homebrew](https://brew.sh) and libraries are installed automatically; Apple/vendor prompts may require confirmation |
 | Game | Your own PC Silent Hill 2 installation with Enhanced Edition resources |
 | Executable | Supported sh2pc.exe SHA-256 below |
 | Storage/network | Space for a separate game copy and build cache; internet for dependencies |
@@ -60,26 +63,30 @@ executable is not interchangeable with the supported version.
 
 ## Install / Установка
 
-1. Download **SH2-macOS-0.1.0-alpha.3-Source-Installer.zip** from
+1. Download **SH2-macOS-0.1.0-alpha.4-Source-Installer.zip** from
    [Releases](https://github.com/brkovv/sh2-macos/releases).
-2. Extract it and open **Start-SH2.command**. Finish installing Apple tools and
-   Homebrew first if they are missing, then rerun.
+2. Extract it and open **Install-SH2.command**. The installer chooses the standard
+   paths and starts missing Apple/Homebrew setup. Complete any system prompts.
 3. Select your PC/Enhanced Edition folder. The installer copies it to a separate
    writable location, installs dependencies, generates code and builds.
 4. When **«Сборка завершена. Запускаем игру.»** appears, the game starts.
 
 Первый запуск собирает игру из вашей копии — это может занять время.
 Архив не содержит готовую игру. Повторные запуски используют локальный кэш.
+После установки запускайте ~/Applications/Silent Hill 2.app или Start Silent Hill 2.command.
 Подробности: [Установка](docs/INSTALLATION.md) и [решение проблем](docs/TROUBLESHOOTING.md).
 
-Game files, saves, backups, build cache and logs live under:
+The app is installed into `~/Applications/Silent Hill 2.app`. Start, Update and
+Uninstall command shortcuts are installed alongside it. Game files, saves, backups,
+build cache and logs live under:
 
 ```text
 ~/Library/Application Support/SH2-brkovv/
 ```
 
-The original folder is preserved. Keep `game/data/save` and `backups` when
-reinstalling. Removing the installer does not remove these files.
+The original PC folder is preserved. A custom data path is supported with
+`Install-SH2.command --base /absolute/path/to/SH2-data`; the path is remembered.
+See [updates](docs/UPDATING.md) and [uninstallation](docs/UNINSTALLING.md).
 
 ## Controls
 
@@ -126,6 +133,7 @@ Generated game code stays on the user's machine and is excluded from Git.
 ```sh
 python3 release-check.py
 python3 release-check.py --publish-check --prerelease
+PYTHONDONTWRITEBYTECODE=1 python3 tests/test_installation.py
 ```
 
 Later scenes, puzzles, combat, save/load and extended Mac audio need more testing.

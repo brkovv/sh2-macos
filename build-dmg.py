@@ -43,7 +43,7 @@ exec /usr/bin/open -a Terminal "$HERE/Start-SH2.command"
     numeric=version.split('-')[0]
     info=dict(CFBundleIdentifier='io.github.brkovv.sh2-macos.installer',CFBundleName='Silent Hill 2',
         CFBundleDisplayName='Silent Hill 2',CFBundleExecutable='SH2',CFBundlePackageType='APPL',
-        CFBundleShortVersionString=numeric,CFBundleVersion='2',LSMinimumSystemVersion='15.0',
+        CFBundleShortVersionString=numeric,CFBundleVersion=version.rsplit('.',1)[-1],LSMinimumSystemVersion='15.0',
         LSArchitecturePriority=['arm64'],NSHighResolutionCapable=True)
     (contents/'Info.plist').write_bytes(plistlib.dumps(info,sort_keys=True))
     (contents/'PkgInfo').write_bytes(b'APPL????')
@@ -53,7 +53,7 @@ exec /usr/bin/open -a Terminal "$HERE/Start-SH2.command"
 Приложение откроет установщик в Terminal. Выберите свою папку PC-игры с Enhanced Edition.
 Первый запуск копирует ваши файлы в отдельную папку и собирает порт из исходников.
 В этом комплекте нет готовой игры, её бинарника или ресурсов.
-Это приватный тестовый кандидат. Подпись/нотаризация и запуск на Mac ещё не подтверждены.
+Это экспериментальный исходный установщик. Подпись/нотаризация и запуск на Mac ещё не подтверждены.
 ''',encoding='utf-8')
     return app,version,len(files)
 
@@ -69,7 +69,7 @@ def main():
     report=dict(app=str(app),version=version,files=count,game_binary_included=False,
         source_installer=True,signed=False,notarized=False,actual_apple_launch_verified=False)
     if not args.bundle_only:
-        dmg=args.output.parent/('SH2-macOS-'+version+'-UNPUBLISHED.dmg')
+        dmg=args.output.parent/('SH2-macOS-'+version+'-Source-Installer.dmg')
         if dmg.exists():raise RuntimeError('Existing DMG preserved: '+str(dmg))
         subprocess.run(['hdiutil','create','-volname','Silent Hill 2','-srcfolder',str(args.output),
                         '-format','UDZO',str(dmg)],check=True)
